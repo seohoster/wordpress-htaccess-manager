@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Lee's WP .htaccess Manager by Magazinon.ro
  * Description: A lightweight plugin by Lee from Magazinon.ro to manage root and wp-admin .htaccess files with predefined blocks. Free to use, brought to you with love from Lee!
- * Version: 1.9.32
+ * Version: 1.9.33
  * Author: Lee @ <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>
  * License: GPL2
  *
@@ -26,6 +26,10 @@
  * 17. get_backups() - Retrieves list of backup files
  * 18. ajax_backup_htaccess() - Handles AJAX requests to backup .htaccess
  * 19. ajax_delete_backup() - Handles AJAX requests to delete a backup
+ * 20. set_admin_notice() - Sets a persistent admin notice
+ * 21. display_admin_notices() - Displays queued admin notices
+ * 22. scan_existing_htaccess() - Scans existing .htaccess for custom rules on activation
+ * 23. extract_custom_rules() - Extracts custom rules from .htaccess content
  */
 
 if (!defined('ABSPATH')) {
@@ -212,33 +216,36 @@ class WP_HTAccess_Manager {
         if (!isset($_POST['save_htaccess'])) {
             return;
         }
-
+    
         if (!check_admin_referer('htaccess_manager_save', 'htaccess_nonce')) {
             return;
         }
-
+    
         $file_to_edit = $_POST['htaccess_file'] ?? 'root';
         $content = stripslashes($_POST['htaccess_content'] ?? '');
-
+    
         $this->backup_htaccess($file_to_edit);
-
+    
         if ($this->validate_htaccess($content)) {
             $target_file = ($file_to_edit === 'admin') ? $this->admin_htaccess : $this->root_htaccess;
+            $original_content = file_exists($target_file) ? file_get_contents($target_file) : '';
             if (file_put_contents($target_file, $content) !== false) {
-                $this->log_changes($content, $content);
+                $this->log_changes($original_content, $content);
                 $this->send_email_notifications("Updated $file_to_edit .htaccess");
-                add_action('admin_notices', function() {
-                    echo '<div class="updated"><p>.htaccess file updated successfully!</p></div>';
-                });
+                $this->set_admin_notice(".htaccess file updated successfully!", 'success');
+    
+                // Preserve custom rules in option if still present
+                if (strpos($content, '# BEGIN CUSTOM_RULES') !== false) {
+                    $custom_rules = $this->extract_custom_rules($content);
+                    update_option("htaccess_manager_custom_rules_{$file_to_edit}", $custom_rules);
+                } else {
+                    delete_option("htaccess_manager_custom_rules_{$file_to_edit}");
+                }
             } else {
-                add_action('admin_notices', function() {
-                    echo '<div class="error"><p>Error: Failed to write to .htaccess file.</p></div>';
-                });
+                $this->set_admin_notice("Error: Failed to write to .htaccess file.", 'error');
             }
         } else {
-            add_action('admin_notices', function() {
-                echo '<div class="error"><p>Error: Invalid .htaccess syntax detected! Changes were not applied.</p></div>';
-            });
+            $this->set_admin_notice("Error: Invalid .htaccess syntax detected! Changes were not applied.", 'error');
         }
     }
 
@@ -247,6 +254,14 @@ class WP_HTAccess_Manager {
         $file_path = $current_file === 'admin' ? $this->admin_htaccess : $this->root_htaccess;
         $content = file_exists($file_path) ? file_get_contents($file_path) : '';
         $backups = $this->get_backups($current_file);
+    
+        // Append custom rules if not already present
+        if ($custom_rules = get_option("htaccess_manager_custom_rules_{$current_file}")) {
+            if (strpos($content, '# BEGIN CUSTOM_RULES') === false) {
+                $content .= "\n# BEGIN CUSTOM_RULES\n# Preserved custom rules from your original .htaccess\n" . $custom_rules . "\n# END CUSTOM_RULES";
+            }
+        }
+    
         ?>
         <div class="wrap">
             <h1>Lee's WP .htaccess Manager by Magazinon.ro</h1>
@@ -624,24 +639,15 @@ class WP_HTAccess_Manager {
         }
     }
 
-    public function ajax_backup_htaccess() {
-        if (!check_ajax_referer('htaccess_backup_nonce', 'nonce', false)) {
-            wp_send_json(['success' => false, 'message' => 'Nonce verification failed']);
-            return;
-        }
-
-        $file_type = $_POST['file'] === 'admin' ? 'admin' : 'root';
-        $content = stripslashes($_POST['content'] ?? '');
-        $backup_filename = $this->backup_dir . $file_type . '-htaccess-preedit-' . date('Y-m-d_H-i-s') . '.bak';
-
+    private function backup_htaccess($file_type, $suffix = null) {
         if (!file_exists($this->backup_dir)) {
             wp_mkdir_p($this->backup_dir);
         }
-
-        if (file_put_contents($backup_filename, $content) !== false) {
-            wp_send_json(['success' => true, 'message' => 'Backup created']);
-        } else {
-            wp_send_json(['success' => false, 'message' => 'Failed to create backup']);
+        $source_file = $file_type === 'admin' ? $this->admin_htaccess : $this->root_htaccess;
+        $backup_suffix = $suffix ?: 'backup-' . date('Y-m-d_H-i-s');
+        $backup_filename = $this->backup_dir . $file_type . '-htaccess-' . $backup_suffix . '.bak';
+        if (file_exists($source_file)) {
+            copy($source_file, $backup_filename);
         }
     }
 
@@ -780,11 +786,62 @@ class WP_HTAccess_Manager {
         }
     }
 
+    private function scan_existing_htaccess($file_type) {
+        $file_path = $file_type === 'admin' ? $this->admin_htaccess : $this->root_htaccess;
+        $content = file_exists($file_path) ? file_get_contents($file_path) : '';
+        if ($content) {
+            $custom_rules = $this->extract_custom_rules($content);
+            if ($custom_rules) {
+                update_option("htaccess_manager_custom_rules_{$file_type}", $custom_rules);
+                $this->set_admin_notice("Existing {$file_type} .htaccess detected. Custom rules preserved and backup created.", 'success');
+            }
+        }
+    }
+
+    private function extract_custom_rules($content) {
+        $known_blocks = [
+            '# BEGIN WordPress', '# END WordPress',
+            '# BEGIN LSCACHE', '# END LSCACHE',
+            '# BEGIN Wordfence WAF', '# END Wordfence WAF',
+            // Add more known markers as needed (e.g., W3 Total Cache, Yoast SEO)
+        ];
+        $lines = explode("\n", $content);
+        $custom = [];
+        $in_known_block = false;
+        $block_start = '';
+    
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+    
+            if (in_array($line, $known_blocks)) {
+                if (strpos($line, '# BEGIN') === 0) {
+                    $in_known_block = true;
+                    $block_start = $line;
+                } elseif (strpos($line, '# END') === 0 && $in_known_block && strpos($line, substr($block_start, 8)) !== false) {
+                    $in_known_block = false;
+                }
+                continue;
+            }
+    
+            if (!$in_known_block && $line[0] !== '#') { // Ignore comments outside blocks
+                $custom[] = $line;
+            }
+        }
+    
+        return !empty($custom) ? implode("\n", $custom) : '';
+    }
+
     public static function activate() {
         $backup_dir = plugin_dir_path(__FILE__) . 'backups' . DIRECTORY_SEPARATOR;
         if (!file_exists($backup_dir)) {
             wp_mkdir_p($backup_dir);
         }
+        $instance = new self();
+        $instance->backup_htaccess('root', 'initial-' . date('Y-m-d_H-i-s'));
+        $instance->backup_htaccess('admin', 'initial-' . date('Y-m-d_H-i-s'));
+        $instance->scan_existing_htaccess('root');
+        $instance->scan_existing_htaccess('admin');
     }
 
     public static function deactivate() {

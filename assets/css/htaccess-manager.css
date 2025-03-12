@@ -1,0 +1,32 @@
+#predefined-blocks .block-button { margin-right: 5px; margin-bottom: 5px; }
+#backup-list ul { list-style: none; padding: 0; }
+#backup-list li { margin: 5px 0; }
+#backup-list button { margin-left: 10px; }
+
+.block-button {     padding: 5px 10px;    margin: 5px;    cursor: pointer;       }
+.block-added {      background-color: #28a745; /* Green */    color: white;  }
+.block-not-added {  background-color: #6c757d; /* Gray */    color: white;   }
+
+.restore-backup {
+    margin-left: 10px;
+    background-color: #0073aa; /* WordPress blue */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.delete-backup {
+    margin-left: 10px;
+    background-color: #dc3545; /* Red */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+#test-result {
+    display: block;
+    margin-top: 10px;
+    font-weight: bold;
+}

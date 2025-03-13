@@ -1,0 +1,245 @@
+# Note: WP_LOGIN_PASSWORD is excluded by default. Use it only for extreme password protection needs (requires .htpasswd setup).
+# BEGIN WP_LOGIN_PASSWORD
+#	# Password Protect wp-login.php
+#	<Files wp-login.php>
+#		AuthType Basic
+#		AuthName "Restricted Area"
+#		AuthUserFile localhost/iwpmanager/.htpasswd
+#		Require valid-user
+#	</Files>
+# END WP_LOGIN_PASSWORD
+
+# BEGIN LSCACHE
+	# LiteSpeed Cache Optimization
+	<IfModule LiteSpeed>
+		CacheEnable public /
+		RewriteEngine On
+		RewriteRule .* - [E=cache-control:max-age=120]
+	</IfModule>
+# END LSCACHE
+
+# BEGIN BROWSER_CACHE
+	# Enable Browser Caching
+	<IfModule mod_expires.c>
+		ExpiresActive On
+		ExpiresByType image/jpg "access plus 1 year"
+		ExpiresByType image/jpeg "access plus 1 year"
+		ExpiresByType image/gif "access plus 1 year"
+		ExpiresByType image/png "access plus 1 year"
+		ExpiresByType text/css "access plus 1 month"
+		ExpiresByType application/javascript "access plus 1 month"
+	</IfModule>
+# END BROWSER_CACHE
+
+# BEGIN GZIP_COMPRESSION
+	# Enable GZIP Compression
+	<IfModule mod_deflate.c>
+		AddOutputFilterByType DEFLATE text/html
+		AddOutputFilterByType DEFLATE text/css
+		AddOutputFilterByType DEFLATE application/javascript
+		BrowserMatch ^Mozilla/4 gzip-only-text/html
+		BrowserMatch ^Mozilla/4\.0[678] no-gzip
+		BrowserMatch \bMSIE !no-gzip !gzip-only-text/html
+	</IfModule>
+# END GZIP_COMPRESSION
+
+# BEGIN SECURITY_WP_CONFIG
+	# Block Access to wp-config.php
+	<IfModule mod_rewrite.c>
+		RewriteRule ^wp-config\.php$ - [F,L]
+	</IfModule>
+# END SECURITY_WP_CONFIG
+
+# BEGIN BLOCK_XMLRPC
+	# Block XML-RPC
+	<Files xmlrpc.php>
+		Order Deny,Allow
+		Deny from all
+	</Files>
+# END BLOCK_XMLRPC
+
+# BEGIN SECURITY_NO_INDEX
+Options -Indexes
+# END SECURITY_NO_INDEX
+
+# BEGIN SECURITY_HT_FILES
+	# Block Access to .htaccess and .htpasswd
+	<FilesMatch "^\.(htaccess|htpasswd)$">
+		Order Deny,Allow
+		Deny from all
+	</FilesMatch>
+# END SECURITY_HT_FILES
+
+# BEGIN REDIRECT_HTTPS
+	# Force HTTPS
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTPS} !=on
+		RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+	</IfModule>
+# END REDIRECT_HTTPS
+
+# BEGIN CORS_ORIGIN
+	# Fix CORS for Fonts and Assets
+	<IfModule mod_headers.c>
+		<FilesMatch "\.(ttf|otf|eot|woff|woff2)$">
+			Header set Access-Control-Allow-Origin "*"
+		</FilesMatch>
+	</IfModule>
+# END CORS_ORIGIN
+
+# BEGIN PHP_TWEAKS
+	php_value upload_max_filesize 20M
+	php_value post_max_size 20M
+	php_value memory_limit 256M
+# END PHP_TWEAKS
+
+# BEGIN MOD_SECURITY
+	# Enable ModSecurity
+	<IfModule mod_security.c>
+		SecFilterEngine On
+		SecFilterScanPOST On
+	</IfModule>
+# END MOD_SECURITY
+
+# BEGIN ANTI_XSS
+	# Anti-XSS and SQL Injection Protection
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC,OR]
+		RewriteCond %{QUERY_STRING} GLOBALS= [NC,OR]
+		RewriteCond %{QUERY_STRING} _REQUEST= [NC,OR]
+		RewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval\() [NC,OR]
+		RewriteCond %{QUERY_STRING} (javascript:|alert\() [NC,OR]
+		RewriteCond %{HTTP_USER_AGENT} (libwww-perl|wget|curl|nikto|sqlmap) [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END ANTI_XSS
+
+# BEGIN HOTLINK_PROTECTION
+	# Prevent Hotlinking (bypassed on localhost)
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)$ [NC]
+		RewriteCond %{HTTP_REFERER} !^$
+		RewriteCond %{HTTP_REFERER} !^https?://(www\.)?localhost/iwpmanager/ [NC]
+		RewriteRule \.(jpg|jpeg|png|gif|webp|pdf|svg)$ - [F,L]
+	</IfModule>
+# END HOTLINK_PROTECTION
+
+# BEGIN BLOCK_AI_BOTS
+	# Block AI Scraping Bots
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTP_USER_AGENT} (GPTBot|ClaudeBot|Google-Extended) [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END BLOCK_AI_BOTS
+
+# BEGIN LIMIT_UPLOAD_SIZE
+	php_value upload_max_filesize 10M
+	php_value post_max_size 10M
+# END LIMIT_UPLOAD_SIZE
+
+# BEGIN DISABLE_PHP_UPLOADS
+	# Disable PHP in wp-content/uploads
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteRule ^wp-content/uploads/.*\.php$ - [F,L]
+	</IfModule>
+# END DISABLE_PHP_UPLOADS
+
+# BEGIN FORCE_DOWNLOAD
+	# Force Downloads for Certain File Types
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteRule \.(pdf|zip|rar)$ - [R=302,L]
+	</IfModule>
+# END FORCE_DOWNLOAD
+
+# BEGIN REDIRECT_WWW
+	# Force non-www
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+		RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+	</IfModule>
+# END REDIRECT_WWW
+
+# BEGIN HSTS_HEADER
+	# Enable HSTS
+	<IfModule mod_headers.c>
+		Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
+	</IfModule>
+# END HSTS_HEADER
+
+# BEGIN SECURITY_HEADERS
+	# Additional Security Headers
+	<IfModule mod_headers.c>
+		Header set X-XSS-Protection "1; mode=block"
+		Header set X-Content-Type-Options "nosniff"
+		Header set X-Permitted-Cross-Domain-Policies "none"
+		Header set X-Frame-Options "SAMEORIGIN"
+		Header set Referrer-Policy "no-referrer-when-downgrade"
+	</IfModule>
+# END SECURITY_HEADERS
+
+# BEGIN DISABLE_USER_ENUM
+	# Disable User Enumeration
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteBase /
+		RewriteCond %{QUERY_STRING} ^author=([0-9]+) [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END DISABLE_USER_ENUM
+
+# BEGIN DISABLE_PHP_WPINCLUDES
+	# Disable PHP in wp-includes
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteRule ^wp-includes/.*\.php$ - [F,L]
+	</IfModule>
+# END DISABLE_PHP_WPINCLUDES
+
+# BEGIN DISABLE_PHP_WPCONTENT
+	# Disable PHP in wp-content (except plugins/themes)
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteRule ^wp-content/(?!plugins/|themes/).*\.php$ - [F,L]
+	</IfModule>
+# END DISABLE_PHP_WPCONTENT
+
+# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN
+	# Prevent Brute Force on wp-login.php
+	<IfModule mod_rewrite.c>
+		RewriteCond %{REQUEST_METHOD} POST
+		RewriteCond %{REQUEST_URI} ^(.*)?wp-login\.php(.*)$
+		RewriteCond %{HTTP_COOKIE} !wordpress_logged_in [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END PREVENT_BRUTE_FORCE_WP_LOGIN
+
+# BEGIN FILE_SCRIPT_PROTECTION
+	# Protect Sensitive Files and Block Hidden Files
+	<IfModule mod_rewrite.c>
+		RewriteRule ^wp-content/uploads/.*\.(log|bak|sql|zip)$ - [F]
+		RewriteRule ^\.(?!well-known).* - [F]
+	</IfModule>
+# END FILE_SCRIPT_PROTECTION
+
+# BEGIN WordPress
+# The directives (lines) between "BEGIN WordPress" and "END WordPress" are
+# dynamically generated, and should only be modified via WordPress filters.
+# Any changes to the directives between these markers will be overwritten.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+
+# END WordPress

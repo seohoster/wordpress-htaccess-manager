@@ -75,10 +75,10 @@
 - Site owners troubleshooting server-level issues
 
 🔄 Changelog
-- Version 1.9.37
+- Version 1.9.38
 - Fixed a htaccess rule issue regarding wp-login
-- Added nounce both JS and as a input element plus htaccess rule - prevents some cases of bruteforcing
 - Added directory protection for backup files
+- Fixed a nounce issue
 
 🔜 Upcoming Features
 - Settings page to toggle email notifications

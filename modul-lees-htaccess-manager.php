@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Lee's WP .htaccess Manager by Magazinon.ro
+ * Plugin Name: Lee's .htaccess Manager by Magazinon.ro
  * Description: A lightweight plugin by Lee from Magazinon.ro to manage root and wp-admin .htaccess files with predefined blocks. Free to use, brought to you with love from Lee!
- * Version: 1.9.33
+ * Version: 1.9.35
  * Author: Lee @ <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>
  * License: GPL2
  *
@@ -47,43 +47,46 @@ class WP_HTAccess_Manager {
     public function __construct() {
         $this->root_htaccess = rtrim(ABSPATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.htaccess';
         $this->admin_htaccess = rtrim(ABSPATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'wp-admin' . DIRECTORY_SEPARATOR . '.htaccess';
-        $this->backup_dir = plugin_dir_path(__FILE__) . 'backups' . DIRECTORY_SEPARATOR;
-        $this->log_file = plugin_dir_path(__FILE__) . 'htaccess_manager.log';
+        
+        // New backup directory location outside plugin folder
+        $this->backup_dir = WP_CONTENT_DIR . DIRECTORY_SEPARATOR . 'htaccess-backups' . DIRECTORY_SEPARATOR;
+        $this->log_file = $this->backup_dir . 'htaccess_manager.log';
 
         $this->blocks = [
-            'LSCACHE' => "# BEGIN LSCACHE\n# LiteSpeed Cache Rules\n<IfModule LiteSpeed>\n\tRewriteEngine on\n\tCacheLookup on\n\tRewriteRule .* - [E=Cache-Control:no-autoflush]\n\tRewriteRule litespeed/debug/.*\\.log$ - [F,L]\n\tRewriteRule \\.litespeed_conf\\.dat - [F,L]\n\tRewriteRule wp-content/.*/[^/]*(responsive|css|js|dynamic|loader|fonts)\\.php - [E=cache-control:max-age=3600]\n\tCacheKeyModify -qs:fbclid\n\tCacheKeyModify -qs:gclid\n\tCacheKeyModify -qs:utm*\n\tCacheKeyModify -qs:_ga\n</IfModule>\n# END LSCACHE",
-            'BROWSER_CACHE' => "# BEGIN BROWSER_CACHE\n# Browser Caching for Static Assets\n<IfModule mod_expires.c>\n\tExpiresActive on\n\tExpiresByType image/jpeg A31557600\n\tExpiresByType image/png A31557600\n\tExpiresByType image/gif A31557600\n\tExpiresByType image/webp A31557600\n\tExpiresByType text/css A31557600\n\tExpiresByType application/javascript A31557600\n\tExpiresByType application/x-font-woff A31557600\n\tExpiresByType image/x-icon A31557600\n\tExpiresByType text/html A86400\n</IfModule>\n<IfModule mod_headers.c>\n\t<FilesMatch \"\\.(ico|jpe?g|png|gif|woff|css|js)$\">\n\t\tHeader set Cache-Control \"max-age=31557600, public\"\n\t</FilesMatch>\n\t<FilesMatch \"\\.(html|htm)$\">\n\t\tHeader set Cache-Control \"max-age=86400, public\"\n\t</FilesMatch>\n</IfModule>\n# END BROWSER_CACHE",
-            'GZIP_COMPRESSION' => "# BEGIN GZIP_COMPRESSION\n# Gzip Compression for Performance\n<IfModule mod_deflate.c>\n\tAddOutputFilterByType DEFLATE text/html text/css text/plain text/xml application/javascript application/json image/svg+xml application/x-font-woff\n\tBrowserMatch ^Mozilla/4 gzip-only-text/html\n\tBrowserMatch ^Mozilla/4\\.0[678] no-gzip\n\tBrowserMatch \\bMSIE !no-gzip !gzip-only-text/html\n</IfModule>\n# END GZIP_COMPRESSION",
-            'SECURITY_WP_CONFIG' => "# BEGIN SECURITY_WP_CONFIG\n# Protect wp-config.php\n<Files wp-config.php>\n\tOrder Allow,Deny\n\tDeny from all\n</Files>\n# END SECURITY_WP_CONFIG",
-            'SECURITY_XMLRPC' => "# BEGIN SECURITY_XMLRPC\n# Block XML-RPC to Prevent Brute Force\n<Files xmlrpc.php>\n\tOrder Allow,Deny\n\tDeny from all\n</Files>\n# END SECURITY_XMLRPC",
-            'SECURITY_NO_INDEX' => "# BEGIN SECURITY_NO_INDEX\n# Disable Directory Listing\nOptions -Indexes\n# END SECURITY_NO_INDEX",
-            'SECURITY_HT_FILES' => "# BEGIN SECURITY_HT_FILES\n# Block .ht* Files\n<Files ~ \"^\\.ht\">\n\tOrder Allow,Deny\n\tDeny from all\n</Files>\n# END SECURITY_HT_FILES",
-            'REDIRECT_HTTPS' => "# BEGIN REDIRECT_HTTPS\n# Force HTTPS\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteCond %{HTTPS} off\n\tRewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]\n</IfModule>\n# END REDIRECT_HTTPS",
-            'WP_LOGIN_PASSWORD' => "# BEGIN WP_LOGIN_PASSWORD\n# Password Protect wp-login.php\n<Files wp-login.php>\n\tAuthType Basic\n\tAuthName \"Secure Area\"\n\tAuthUserFile \"/path/to/.htpasswd\"\n\tRequire valid-user\n</Files>\n# END WP_LOGIN_PASSWORD",
-            'CORS_ORIGIN' => "# BEGIN CORS_ORIGIN\n# Fix CORS for Fonts and Assets\n<IfModule mod_headers.c>\n\t<FilesMatch \"\\.(ttf|otf|woff|woff2|css|js)$\">\n\t\tHeader set Access-Control-Allow-Origin \"*\"\n\t</FilesMatch>\n</IfModule>\n# END CORS_ORIGIN",
-            'PHP_TWEAKS' => "# BEGIN PHP_TWEAKS\n# PHP Configuration Tweaks\nphp_value max_input_vars 100000\nphp_value suhosin.request.max_vars 2048\nphp_value suhosin.request.max_value_length 1000000\nphp_value suhosin.post.max_vars 2048\nphp_value suhosin.post.max_value_length 1000000\nphp_value max_execution_time 30000\n# END PHP_TWEAKS",
-            'MOD_SECURITY' => "# BEGIN MOD_SECURITY\n# ModSecurity Filtering for Security\n<IfModule mod_security.c>\n\tSecFilterEngine On\n\tSecAuditEngine RelevantOnly\n\tSecFilterCheckURLEncoding On\n\tSecFilterCheckUnicodeEncoding On\n\tSecFilterForceByteRange 1 255\n\tSecFilterScanPOST On\n\tSecFilterDefaultAction \"deny,log,status:406\"\n\tSecFilter \"select.+from\"\n\tSecFilter \"drop[[:space:]]table\"\n\tSecFilter \"insert[[:space:]]into\"\n\tSecFilter \"<script\"\n\tSecFilter \"\\.\\./\"\n\tSecFilterSelective REQUEST_METHOD \"^POST$\" chain\n\tSecFilterSelective HTTP_Content-Length \"^$\"\n</IfModule>\n# END MOD_SECURITY",
-            'ANTI_XSS' => "# BEGIN ANTI_XSS\n# Anti-XSS and SQL Injection Protection\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC,OR]\n\tRewriteCond %{QUERY_STRING} GLOBALS= [NC,OR]\n\tRewriteCond %{QUERY_STRING} _REQUEST= [NC,OR]\n\tRewriteCond %{QUERY_STRING} union|select|insert|drop|update|md5|benchmark [NC]\n\tRewriteRule .* - [F,L]\n</IfModule>\n# END ANTI_XSS",
-            'HOTLINK_PROTECTION' => "# BEGIN HOTLINK_PROTECTION\n# Prevent Hotlinking (bypassed on localhost)\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteCond %{HTTP_HOST} !^(localhost|127\\.0\\.0\\.1)$ [NC]\n\tRewriteCond %{HTTP_REFERER} !^$\n\tRewriteCond %{HTTP_REFERER} !^https?://(www\\.)?{{HOME_URL}}/ [NC]\n\tRewriteRule \\.(jpg|jpeg|png|gif|webp|pdf)$ - [F,L]\n</IfModule>\n# END HOTLINK_PROTECTION",
-            'BLOCK_BOTS' => "# BEGIN BLOCK_BOTS\n# Block AI Scraping Bots\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteCond %{HTTP_USER_AGENT} (CCBot|ChatGPT-User|GPTBot|Google-Extended|Google-CloudVertexBot|Applebot-Extended|anthropic-ai|ClaudeBot|Omgilibot|Omgili|Diffbot|AI2Bot|Bytespider|PanguBot|ImagesiftBot|PerplexityBot|cohere-ai|cohere-training-data-crawler|Timpibot|YouBot) [NC]\n\tRewriteRule .* - [F,L]\n</IfModule>\n# END BLOCK_BOTS",
-            'LIMIT_UPLOAD_SIZE' => "# BEGIN LIMIT_UPLOAD_SIZE\n# Limit Upload Size to 10MB\nLimitRequestBody 10485760\n# END LIMIT_UPLOAD_SIZE",
-            'DISABLE_PHP_EXECUTION' => "# BEGIN DISABLE_PHP_EXECUTION\n# Disable PHP in Uploads\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteRule ^wp-content/uploads/.*\\.php$ - [F,L]\n</IfModule>\n# END DISABLE_PHP_EXECUTION",
-            'FORCE_DOWNLOAD' => "# BEGIN FORCE_DOWNLOAD\n# Force Download for Files\n<FilesMatch \"\\.(pdf|zip|rar)$\">\n\tForceType application/octet-stream\n\tHeader set Content-Disposition attachment\n</FilesMatch>\n# END FORCE_DOWNLOAD",
-            'REDIRECT_WWW' => "# BEGIN REDIRECT_WWW\n# Force non-www\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\n\tRewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]\n</IfModule>\n# END REDIRECT_WWW",
-            'HSTS_HEADER' => "# BEGIN HSTS_HEADER\n# Enable HSTS\n<IfModule mod_headers.c>\n\tHeader set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" env=HTTPS\n</IfModule>\n# END HSTS_HEADER", // Updated with preload
-            // New blocks
-            'SECURITY_HEADERS' => "# BEGIN SECURITY_HEADERS\n# Additional Security Headers\n<IfModule mod_headers.c>\n\tHeader set X-XSS-Protection \"1; mode=block\"\n\tHeader set X-Content-Type-Options \"nosniff\"\n\tHeader set X-Permitted-Cross-Domain-Policies \"none\"\n\tHeader set X-Frame-Options \"SAMEORIGIN\"\n\tHeader set Referrer-Policy \"no-referrer-when-downgrade\"\n</IfModule>\n# END SECURITY_HEADERS",
-            'DISABLE_USER_ENUM' => "# BEGIN DISABLE_USER_ENUM\n# Disable User Enumeration\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteBase /\n\tRewriteCond %{QUERY_STRING} author=d\n\tRewriteRule ^.*$ - [F,L]\n</IfModule>\n# END DISABLE_USER_ENUM",
-            'DISABLE_PHP_INCLUDES' => "# BEGIN DISABLE_PHP_INCLUDES\n# Disable PHP in wp-includes\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n</IfModule>\n# END DISABLE_PHP_INCLUDES",
-            'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n# Disable PHP in wp-content (except plugins/themes)\n<IfModule mod_rewrite.c>\n\tRewriteEngine On\n\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n</IfModule>\n# END DISABLE_PHP_WPCONTENT"    
+            'LSCACHE' => "# BEGIN LSCACHE\n\t# LiteSpeed Cache Optimization\n\t<IfModule LiteSpeed>\n\t\tCacheEnable public /\n\t\tRewriteEngine On\n\t\tRewriteRule .* - [E=cache-control:max-age=120]\n\t</IfModule>\n# END LSCACHE\n",
+            'BROWSER_CACHE' => "# BEGIN BROWSER_CACHE\n\t# Enable Browser Caching\n\t<IfModule mod_expires.c>\n\t\tExpiresActive On\n\t\tExpiresByType image/jpg \"access plus 1 year\"\n\t\tExpiresByType image/jpeg \"access plus 1 year\"\n\t\tExpiresByType image/gif \"access plus 1 year\"\n\t\tExpiresByType image/png \"access plus 1 year\"\n\t\tExpiresByType text/css \"access plus 1 month\"\n\t\tExpiresByType application/javascript \"access plus 1 month\"\n\t</IfModule>\n# END BROWSER_CACHE\n",
+            'GZIP_COMPRESSION' => "# BEGIN GZIP_COMPRESSION\n\t# Enable GZIP Compression\n\t<IfModule mod_deflate.c>\n\t\tAddOutputFilterByType DEFLATE text/html\n\t\tAddOutputFilterByType DEFLATE text/css\n\t\tAddOutputFilterByType DEFLATE application/javascript\n\t\tBrowserMatch ^Mozilla/4 gzip-only-text/html\n\t\tBrowserMatch ^Mozilla/4\\.0[678] no-gzip\n\t\tBrowserMatch \\bMSIE !no-gzip !gzip-only-text/html\n\t</IfModule>\n# END GZIP_COMPRESSION\n",
+            'SECURITY_WP_CONFIG' => "# BEGIN SECURITY_WP_CONFIG\n\t# Block Access to wp-config.php\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-config\\.php$ - [F,L]\n\t</IfModule>\n# END SECURITY_WP_CONFIG\n",
+            'BLOCK_XMLRPC' => "# BEGIN BLOCK_XMLRPC\n\t# Block XML-RPC\n\t<Files xmlrpc.php>\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</Files>\n# END BLOCK_XMLRPC\n",
+            'SECURITY_NO_INDEX' => "# BEGIN SECURITY_NO_INDEX\nOptions -Indexes\n# END SECURITY_NO_INDEX\n",
+            'SECURITY_HT_FILES' => "# BEGIN SECURITY_HT_FILES\n\t# Block Access to .htaccess and .htpasswd\n\t<FilesMatch \"^\\.(htaccess|htpasswd)$\">\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</FilesMatch>\n# END SECURITY_HT_FILES\n",
+            'REDIRECT_HTTPS' => "# BEGIN REDIRECT_HTTPS\n\t# Force HTTPS\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTPS} !=on\n\t\tRewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_HTTPS\n",
+            'WP_LOGIN_PASSWORD' => "# BEGIN WP_LOGIN_PASSWORD\n\t# Password Protect wp-login.php\n\t<Files wp-login.php>\n\t\tAuthType Basic\n\t\tAuthName \"Restricted Area\"\n\t\tAuthUserFile {{HOME_URL}}/.htpasswd\n\t\tRequire valid-user\n\t</Files>\n# END WP_LOGIN_PASSWORD\n",
+            'CORS_ORIGIN' => "# BEGIN CORS_ORIGIN\n\t# Fix CORS for Fonts and Assets\n\t<IfModule mod_headers.c>\n\t\t<FilesMatch \"\\.(ttf|otf|eot|woff|woff2)$\">\n\t\t\tHeader set Access-Control-Allow-Origin \"*\"\n\t\t</FilesMatch>\n\t</IfModule>\n# END CORS_ORIGIN\n",
+            'PHP_TWEAKS' => "# BEGIN PHP_TWEAKS\n\tphp_value upload_max_filesize 20M\n\tphp_value post_max_size 20M\n\tphp_value memory_limit 256M\n# END PHP_TWEAKS\n",
+            'MOD_SECURITY' => "# BEGIN MOD_SECURITY\n\t# Enable ModSecurity\n\t<IfModule mod_security.c>\n\t\tSecFilterEngine On\n\t\tSecFilterScanPOST On\n\t</IfModule>\n# END MOD_SECURITY\n",
+            'ANTI_XSS' => "# BEGIN ANTI_XSS\n\t# Anti-XSS and SQL Injection Protection\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} GLOBALS= [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} _REQUEST= [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval\\() [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (javascript:|alert\\() [NC,OR]\n\t\tRewriteCond %{HTTP_USER_AGENT} (libwww-perl|wget|curl|nikto|sqlmap) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END ANTI_XSS\n",
+            'HOTLINK_PROTECTION' => "# BEGIN HOTLINK_PROTECTION\n\t# Prevent Hotlinking (bypassed on localhost)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_HOST} !^(localhost|127\\.0\\.0\\.1)$ [NC]\n\t\tRewriteCond %{HTTP_REFERER} !^$\n\t\tRewriteCond %{HTTP_REFERER} !^https?://(www\\.)?{{HOME_URL}}/ [NC]\n\t\tRewriteRule \\.(jpg|jpeg|png|gif|webp|pdf|svg)$ - [F,L]\n\t</IfModule>\n# END HOTLINK_PROTECTION\n",
+            'BLOCK_AI_BOTS' => "# BEGIN BLOCK_AI_BOTS\n\t# Block AI Scraping Bots\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_USER_AGENT} (GPTBot|ClaudeBot|Google-Extended) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END BLOCK_AI_BOTS\n",
+            'LIMIT_UPLOAD_SIZE' => "# BEGIN LIMIT_UPLOAD_SIZE\n\tphp_value upload_max_filesize 10M\n\tphp_value post_max_size 10M\n# END LIMIT_UPLOAD_SIZE\n",
+            'DISABLE_PHP_UPLOADS' => "# BEGIN DISABLE_PHP_UPLOADS\n\t# Disable PHP in wp-content/uploads\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/uploads/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_UPLOADS\n",
+            'FORCE_DOWNLOAD' => "# BEGIN FORCE_DOWNLOAD\n\t# Force Downloads for Certain File Types\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule \\.(pdf|zip|rar)$ - [R=302,L]\n\t</IfModule>\n# END FORCE_DOWNLOAD\n",
+            'REDIRECT_WWW' => "# BEGIN REDIRECT_WWW\n\t# Force non-www\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\n\t\tRewriteRule ^(.*)$ https://%1/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_WWW\n",
+            'HSTS_HEADER' => "# BEGIN HSTS_HEADER\n\t# Enable HSTS\n\t<IfModule mod_headers.c>\n\t\tHeader set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" env=HTTPS\n\t</IfModule>\n# END HSTS_HEADER\n",
+            'SECURITY_HEADERS' => "# BEGIN SECURITY_HEADERS\n\t# Additional Security Headers\n\t<IfModule mod_headers.c>\n\t\tHeader set X-XSS-Protection \"1; mode=block\"\n\t\tHeader set X-Content-Type-Options \"nosniff\"\n\t\tHeader set X-Permitted-Cross-Domain-Policies \"none\"\n\t\tHeader set X-Frame-Options \"SAMEORIGIN\"\n\t\tHeader set Referrer-Policy \"no-referrer-when-downgrade\"\n\t</IfModule>\n# END SECURITY_HEADERS\n",
+            'DISABLE_USER_ENUM' => "# BEGIN DISABLE_USER_ENUM\n\t# Disable User Enumeration\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteBase /\n\t\tRewriteCond %{QUERY_STRING} ^author=([0-9]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END DISABLE_USER_ENUM\n",
+            'DISABLE_PHP_WPINCLUDES' => "# BEGIN DISABLE_PHP_WPINCLUDES\n\t# Disable PHP in wp-includes\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPINCLUDES\n",
+            'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n\t# Disable PHP in wp-content (except plugins/themes)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPCONTENT\n",
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Prevent Brute Force on wp-login.php\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{HTTP_COOKIE} !wordpress_logged_in [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
+            'FILE_SCRIPT_PROTECTION' => "# BEGIN FILE_SCRIPT_PROTECTION\n\t# Protect Sensitive Files and Block Hidden Files\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-content/uploads/.*\\.(log|bak|sql|zip)$ - [F]\n\t\tRewriteRule ^\\.(?!well-known).* - [F]\n\t</IfModule>\n# END FILE_SCRIPT_PROTECTION\n"
         ];
-
+    
         $this->block_descriptions = [
             'LSCACHE' => 'Optimizes caching for LiteSpeed servers.',
             'BROWSER_CACHE' => 'Enables browser caching for static assets like images and scripts.',
             'GZIP_COMPRESSION' => 'Compresses content to speed up page loads.',
             'SECURITY_WP_CONFIG' => 'Blocks access to wp-config.php.',
-            'SECURITY_XMLRPC' => 'Disables XML-RPC to prevent brute-force attacks.',
+            'BLOCK_XMLRPC' => 'Disables XML-RPC to prevent brute-force attacks.',
             'SECURITY_NO_INDEX' => 'Prevents directory listing.',
             'SECURITY_HT_FILES' => 'Blocks access to .htaccess and similar files.',
             'REDIRECT_HTTPS' => 'Forces all traffic to HTTPS.',
@@ -91,18 +94,20 @@ class WP_HTAccess_Manager {
             'CORS_ORIGIN' => 'Fixes CORS issues for fonts and assets.',
             'PHP_TWEAKS' => 'Adjusts PHP settings for better performance.',
             'MOD_SECURITY' => 'Enables ModSecurity filters for extra protection.',
-            'ANTI_XSS' => 'Blocks XSS and SQL injection attempts in query strings.',
+            'ANTI_XSS' => 'Blocks XSS, SQL injection, and malicious user agents in query strings.',
             'HOTLINK_PROTECTION' => 'Prevents other sites from hotlinking your files (disabled on localhost).',
-            'BLOCK_BOTS' => 'Blocks AI scraping bots like GPTBot and ClaudeBot.',
+            'BLOCK_AI_BOTS' => 'Blocks AI scraping bots like GPTBot and ClaudeBot.',
             'LIMIT_UPLOAD_SIZE' => 'Caps upload size at 10MB to prevent abuse.',
-            'DISABLE_PHP_EXECUTION' => 'Blocks PHP execution in wp-content/uploads.',
+            'DISABLE_PHP_UPLOADS' => 'Blocks PHP execution in wp-content/uploads.',
             'FORCE_DOWNLOAD' => 'Forces downloads for PDFs, ZIPs, and RARs.',
             'REDIRECT_WWW' => 'Forces non-www URLs (toggleable to www).',
             'HSTS_HEADER' => 'Enforces HTTPS with HSTS for a year, with preload support.',
             'SECURITY_HEADERS' => 'Adds security headers to protect against common web vulnerabilities.',
             'DISABLE_USER_ENUM' => 'Prevents user enumeration via author query strings.',
-            'DISABLE_PHP_INCLUDES' => 'Blocks PHP execution in wp-includes directory.',
-            'DISABLE_PHP_WPCONTENT' => 'Blocks PHP execution in wp-content, except in plugins and themes.'
+            'DISABLE_PHP_WPINCLUDES' => 'Blocks PHP execution in wp-includes directory.',
+            'DISABLE_PHP_WPCONTENT' => 'Blocks PHP execution in wp-content, except in plugins and themes.',
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => 'Blocks unauthenticated POST requests to wp-login.php to prevent brute force attacks.',
+            'FILE_SCRIPT_PROTECTION' => 'Blocks access to sensitive file types in uploads and hidden files except .well-known.'
         ];
 
         add_action('admin_menu', [$this, 'add_admin_page']);
@@ -264,7 +269,7 @@ class WP_HTAccess_Manager {
     
         ?>
         <div class="wrap">
-            <h1>Lee's WP .htaccess Manager by Magazinon.ro</h1>
+            <h1>Lee's .htaccess Manager</h1>
             <p style="font-size: 14px;">Crafted with care by Lee - Check out more awesome tools at <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>!</p>
             <div class="htaccess-menu">
                 <a href="<?php echo admin_url('admin.php?page=htaccess-manager&file=root'); ?>" class="button <?php echo $current_file === 'root' ? 'button-primary' : ''; ?>">Root .htaccess</a>
@@ -310,276 +315,264 @@ class WP_HTAccess_Manager {
             <p style="text-align: center; font-size: 12px;">Enjoying this free plugin? Support Lee by visiting <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a> for more cool stuff!</p>
         </div>
         <script>
-            jQuery(document).ready(function($) {
-                var editor = CodeMirror.fromTextArea(document.getElementById('htaccess-editor'), {
-                    lineNumbers: true,
-                    mode: 'apache',
-                    theme: 'default'
-                });
-    
-                // Restore content from transient if available
-                <?php
-                if ($transient_content = get_transient('htaccess_manager_test_content')) {
-                    echo "editor.setValue(" . json_encode($transient_content) . ");";
-                    delete_transient('htaccess_manager_test_content'); // Clear after use
-                }
-                ?>
-    
-                // Function to update button states
-                function updateButtonStates() {
-                    var content = editor.getValue().trim();
-                    $('.block-button').each(function() {
-                        var blockKey = $(this).data('block');
-                        var startMarker = '# BEGIN ' + blockKey;
-                        var isPresent = content.indexOf(startMarker) !== -1;
-                        $(this).removeClass('block-added block-not-added')
-                               .addClass(isPresent ? 'block-added' : 'block-not-added');
-                    });
-                }
-    
-                // Initial button state update
-                updateButtonStates();
-    
-                // Update states on content change and auto-backup
-                editor.on('change', function() {
-                    updateButtonStates();
-                    var content = editor.getValue();
-                    $.ajax({
-                        url: htaccessData.ajax_url,
-                        method: 'POST',
-                        data: {
-                            action: 'backup_htaccess',
-                            file: '<?php echo esc_js($current_file); ?>',
-                            content: content,
-                            nonce: htaccessData.backup_nonce
-                        },
-                        success: function(response) {
-                            if (!response.success) {
-                                console.log('Backup failed: ' + response.message);
-                            }
-                        },
-                        error: function(xhr, status, error) {
-                            console.log('Backup AJAX error: ' + error);
-                        }
-                    });
-                });
-    
-                // Toggle block on button click
-                $('.block-button').on('click', function() {
+        jQuery(document).ready(function($) {
+            var editor = CodeMirror.fromTextArea(document.getElementById('htaccess-editor'), {
+                lineNumbers: true,
+                mode: 'apache',
+                theme: 'default'
+            });
+
+            // Restore content from transient if available
+            <?php
+            if ($transient_content = get_transient('htaccess_manager_test_content')) {
+                echo "editor.setValue(" . json_encode($transient_content) . ");";
+                delete_transient('htaccess_manager_test_content');
+            }
+            ?>
+
+            // Function to update button states
+            function updateButtonStates() {
+                var content = editor.getValue().trim();
+                $('.block-button').each(function() {
                     var blockKey = $(this).data('block');
-                    var blockContent = htaccessData.blocks[blockKey];
-                    blockContent = blockContent.replace('{{HOME_URL}}', htaccessData.home_url.replace(/^https?:\/\//, ''));
-                    var currentContent = editor.getValue().trim();
                     var startMarker = '# BEGIN ' + blockKey;
-                    var endMarker = '# END ' + blockKey;
-    
-                    var startIdx = currentContent.indexOf(startMarker);
-                    if (startIdx !== -1) {
-                        var endIdx = currentContent.indexOf(endMarker, startIdx);
-                        if (endIdx !== -1) {
-                            endIdx += endMarker.length;
-                            currentContent = currentContent.substring(0, startIdx).trim() + '\n' + currentContent.substring(endIdx).trim();
-                            editor.setValue(currentContent.trim());
-                        }
-                    } else {
-                        var wpStart = currentContent.indexOf('# BEGIN WordPress');
-                        var newContent = '';
-                        if (wpStart === -1) {
-                            newContent = currentContent ? blockContent + '\n' + currentContent : blockContent;
-                        } else {
-                            newContent = currentContent.substring(0, wpStart).trim() + (currentContent.substring(0, wpStart) ? '\n' : '') + blockContent + '\n' + currentContent.substring(wpStart).trim();
-                        }
-                        editor.setValue(newContent.trim());
-                    }
-                    updateButtonStates();
+                    var isPresent = content.indexOf(startMarker) !== -1;
+                    $(this).removeClass('block-added block-not-added')
+                           .addClass(isPresent ? 'block-added' : 'block-not-added');
                 });
-    
-                // Add All Rules button handler
-                $('#add-all-rules').on('click', function() {
-                    var currentContent = editor.getValue().trim();
-                    var wpBlock = '';
-                    var newContent = '# Note: WP_LOGIN_PASSWORD is excluded by default. Use it only for extreme password protection needs (requires .htpasswd setup).\n';
-    
-                    var wpStart = currentContent.indexOf('# BEGIN WordPress');
-                    if (wpStart !== -1) {
-                        var wpEnd = currentContent.indexOf('# END WordPress', wpStart);
-                        if (wpEnd !== -1) {
-                            wpEnd += '# END WordPress'.length;
-                            wpBlock = currentContent.substring(wpStart, wpEnd).trim();
-                            currentContent = currentContent.substring(0, wpStart).trim() + currentContent.substring(wpEnd).trim();
+            }
+
+            // Initial button state update
+            updateButtonStates();
+
+            // Update states on content change and auto-backup
+            editor.on('change', function() {
+                updateButtonStates();
+                var content = editor.getValue();
+                $.ajax({
+                    url: htaccessData.ajax_url,
+                    method: 'POST',
+                    data: {
+                        action: 'backup_htaccess',
+                        file: '<?php echo esc_js($current_file); ?>',
+                        content: content,
+                        nonce: htaccessData.backup_nonce
+                    },
+                    success: function(response) {
+                        if (!response.success) {
+                            console.log('Backup failed: ' + response.message);
                         }
-                    }
-    
-                    for (var blockKey in htaccessData.blocks) {
-                        if (blockKey !== 'WP_LOGIN_PASSWORD') {
-                            var blockContent = htaccessData.blocks[blockKey];
-                            blockContent = blockContent.replace('{{HOME_URL}}', htaccessData.home_url.replace(/^https?:\/\//, ''));
-                            var startMarker = '# BEGIN ' + blockKey;
-                            var endMarker = '# END ' + blockKey;
-    
-                            var startIdx = currentContent.indexOf(startMarker);
-                            if (startIdx !== -1) {
-                                var endIdx = currentContent.indexOf(endMarker, startIdx);
-                                if (endIdx !== -1) {
-                                    endIdx += endMarker.length;
-                                    currentContent = currentContent.substring(0, startIdx).trim() + currentContent.substring(endIdx).trim();
-                                }
-                            }
-    
-                            newContent += blockContent + '\n';
-                        }
-                    }
-    
-                    if (wpBlock) {
-                        newContent += wpBlock;
-                    }
-    
-                    editor.setValue(newContent.trim());
-                    updateButtonStates();
-                });
-    
-                // Delete All Rules button handler
-                $('#delete-all-rules').on('click', function() {
-                    if (!confirm('Are you sure you want to delete all custom rules? This will keep WordPress, LiteSpeed Cache, and Wordfence WAF rules if present.')) {
-                        return;
-                    }
-    
-                    var currentContent = editor.getValue().trim();
-                    var newContent = '';
-                    var wpBlock = '';
-                    var lscacheBlock = '';
-                    var wordfenceBlock = '';
-    
-                    var wpStart = currentContent.indexOf('# BEGIN WordPress');
-                    if (wpStart !== -1) {
-                        var wpEnd = currentContent.indexOf('# END WordPress', wpStart);
-                        if (wpEnd !== -1) {
-                            wpEnd += '# END WordPress'.length;
-                            wpBlock = currentContent.substring(wpStart, wpEnd).trim();
-                        }
-                    }
-    
-                    var lscacheStart = currentContent.indexOf('# BEGIN LSCACHE');
-                    if (lscacheStart !== -1) {
-                        var lscacheEnd = currentContent.indexOf('# END LSCACHE', lscacheStart);
-                        if (lscacheEnd !== -1) {
-                            lscacheEnd += '# END LSCACHE'.length;
-                            lscacheBlock = currentContent.substring(lscacheStart, lscacheEnd).trim();
-                        }
-                    }
-    
-                    var wfStart = currentContent.indexOf('# BEGIN Wordfence WAF');
-                    if (wfStart !== -1) {
-                        var wfEnd = currentContent.indexOf('# END Wordfence WAF', wfStart);
-                        if (wfEnd !== -1) {
-                            wfEnd += '# END Wordfence WAF'.length;
-                            wordfenceBlock = currentContent.substring(wfStart, wfEnd).trim();
-                        }
-                    }
-    
-                    if (lscacheBlock) {
-                        newContent += lscacheBlock + '\n';
-                    }
-                    if (wordfenceBlock) {
-                        newContent += wordfenceBlock + '\n';
-                    }
-                    if (wpBlock) {
-                        newContent += wpBlock;
-                    }
-    
-                    editor.setValue(newContent.trim());
-                    updateButtonStates();
-                });
-    
-                // Test Rules button handler
-                $('#test-htaccess').on('click', function() {
-                    var content = editor.getValue();
-                    $.ajax({
-                        url: htaccessData.ajax_url,
-                        method: 'POST',
-                        data: {
-                            action: 'test_htaccess',
-                            content: content,
-                            file: '<?php echo esc_js($current_file); ?>',
-                            nonce: htaccessData.nonce,
-                            editor_content: content // Send editor content
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                location.reload(); // Refresh to show notice and restore content
-                            } else {
-                                location.reload(); // Refresh to show error notice and restore content
-                            }
-                        },
-                        error: function(xhr, status, error) {
-                            console.log('Test AJAX error: ' + error);
-                            location.reload(); // Refresh to show generic error notice
-                        }
-                    });
-                });
-    
-                // Restore Backup button handler
-                $('.restore-backup').on('click', function() {
-                    var backupFile = $(this).data('file');
-                    var targetFile = $(this).data('target');
-                    if (confirm('Restore ' + backupFile + ' to ' + targetFile + ' .htaccess?')) {
-                        $.ajax({
-                            url: htaccessData.ajax_url,
-                            method: 'POST',
-                            data: {
-                                action: 'restore_backup',
-                                backup: backupFile,
-                                file: targetFile,
-                                nonce: htaccessData.restore_nonce
-                            },
-                            success: function(response) {
-                                if (response.success) {
-                                    editor.setValue(response.content || '');
-                                    location.reload(); // Refresh to show notice
-                                } else {
-                                    location.reload(); // Refresh to show error notice
-                                }
-                            },
-                            error: function(xhr, status, error) {
-                                console.log('Restore AJAX error: ' + error);
-                                location.reload(); // Refresh to show generic error notice
-                            }
-                        });
-                    }
-                });
-    
-                // Delete Backup button handler
-                $('.delete-backup').on('click', function() {
-                    var backupFile = $(this).data('file');
-                    var targetFile = $(this).data('target');
-                    if (confirm('Delete backup ' + backupFile + '? This action cannot be undone.')) {
-                        $.ajax({
-                            url: htaccessData.ajax_url,
-                            method: 'POST',
-                            data: {
-                                action: 'delete_backup',
-                                backup: backupFile,
-                                file: targetFile,
-                                nonce: htaccessData.delete_nonce
-                            },
-                            success: function(response) {
-                                if (response.success) {
-                                    location.reload(); // Refresh to show notice and update list
-                                } else {
-                                    location.reload(); // Refresh to show error notice
-                                }
-                            },
-                            error: function(xhr, status, error) {
-                                console.log('Delete AJAX error: ' + error);
-                                location.reload(); // Refresh to show generic error notice
-                            }
-                        });
+                    },
+                    error: function(xhr, status, error) {
+                        console.log('Backup AJAX error: ' + error);
                     }
                 });
             });
-        </script>
-        <?php
-    }
+
+            // Toggle block on button click
+            $('.block-button').on('click', function() {
+                var blockKey = $(this).data('block');
+                var blockContent = htaccessData.blocks[blockKey];
+                blockContent = blockContent.replace('{{HOME_URL}}', htaccessData.home_url.replace(/^https?:\/\//, ''));
+                var currentContent = editor.getValue().trim();
+                var startMarker = '# BEGIN ' + blockKey;
+                var endMarker = '# END ' + blockKey;
+
+                var startIdx = currentContent.indexOf(startMarker);
+                if (startIdx !== -1) {
+                    var endIdx = currentContent.indexOf(endMarker, startIdx);
+                    if (endIdx !== -1) {
+                        endIdx += endMarker.length;
+                        currentContent = currentContent.substring(0, startIdx).trim() + '\n' + currentContent.substring(endIdx).trim();
+                        editor.setValue(currentContent.trim());
+                    }
+                } else {
+                    var wpStart = currentContent.indexOf('# BEGIN WordPress');
+                    var newContent = '';
+                    if (wpStart === -1) {
+                        newContent = currentContent ? blockContent + '\n' + currentContent : blockContent;
+                    } else {
+                        newContent = currentContent.substring(0, wpStart).trim() + (currentContent.substring(0, wpStart) ? '\n' : '') + blockContent + '\n' + currentContent.substring(wpStart).trim();
+                    }
+                    editor.setValue(newContent.trim());
+                }
+                updateButtonStates();
+            });
+
+            // Add All Rules button handler
+            $('#add-all-rules').on('click', function() {
+                var currentContent = editor.getValue().trim();
+                var wpBlock = '';
+                var newContent = '# Note: WP_LOGIN_PASSWORD is excluded by default. Use it only for extreme password protection needs (requires .htpasswd setup).\n';
+
+                var wpStart = currentContent.indexOf('# BEGIN WordPress');
+                if (wpStart !== -1) {
+                    var wpEnd = currentContent.indexOf('# END WordPress', wpStart);
+                    if (wpEnd !== -1) {
+                        wpEnd += '# END WordPress'.length;
+                        wpBlock = currentContent.substring(wpStart, wpEnd).trim();
+                        currentContent = currentContent.substring(0, wpStart).trim() + currentContent.substring(wpEnd).trim();
+                    }
+                }
+
+                for (var blockKey in htaccessData.blocks) {
+                    if (blockKey !== 'WP_LOGIN_PASSWORD') {
+                        var blockContent = htaccessData.blocks[blockKey];
+                        blockContent = blockContent.replace('{{HOME_URL}}', htaccessData.home_url.replace(/^https?:\/\//, ''));
+                        var startMarker = '# BEGIN ' + blockKey;
+                        var endMarker = '# END ' + blockKey;
+
+                        var startIdx = currentContent.indexOf(startMarker);
+                        if (startIdx !== -1) {
+                            var endIdx = currentContent.indexOf(endMarker, startIdx);
+                            if (endIdx !== -1) {
+                                endIdx += endMarker.length;
+                                currentContent = currentContent.substring(0, startIdx).trim() + currentContent.substring(endIdx).trim();
+                            }
+                        }
+
+                        newContent += blockContent + '\n';
+                    }
+                }
+
+                if (wpBlock) {
+                    newContent += wpBlock;
+                }
+
+                editor.setValue(newContent.trim());
+                updateButtonStates();
+            });
+
+            // Delete All Rules button handler - Modified to remove LSCACHE
+            $('#delete-all-rules').on('click', function() {
+                if (!confirm('Are you sure you want to delete all custom rules? This will keep only WordPress and Wordfence WAF rules if present.')) {
+                    return;
+                }
+
+                var currentContent = editor.getValue().trim();
+                var newContent = '';
+                var wpBlock = '';
+                var wordfenceBlock = '';
+
+                var wpStart = currentContent.indexOf('# BEGIN WordPress');
+                if (wpStart !== -1) {
+                    var wpEnd = currentContent.indexOf('# END WordPress', wpStart);
+                    if (wpEnd !== -1) {
+                        wpEnd += '# END WordPress'.length;
+                        wpBlock = currentContent.substring(wpStart, wpEnd).trim();
+                    }
+                }
+
+                var wfStart = currentContent.indexOf('# BEGIN Wordfence WAF');
+                if (wfStart !== -1) {
+                    var wfEnd = currentContent.indexOf('# END Wordfence WAF', wfStart);
+                    if (wfEnd !== -1) {
+                        wfEnd += '# END Wordfence WAF'.length;
+                        wordfenceBlock = currentContent.substring(wfStart, wfEnd).trim();
+                    }
+                }
+
+                // Only keep WordPress and Wordfence WAF, remove LSCACHE
+                if (wordfenceBlock) {
+                    newContent += wordfenceBlock + '\n';
+                }
+                if (wpBlock) {
+                    newContent += wpBlock;
+                }
+
+                editor.setValue(newContent.trim());
+                updateButtonStates();
+            });
+
+            // Test Rules button handler
+            $('#test-htaccess').on('click', function() {
+                var content = editor.getValue();
+                $.ajax({
+                    url: htaccessData.ajax_url,
+                    method: 'POST',
+                    data: {
+                        action: 'test_htaccess',
+                        content: content,
+                        file: '<?php echo esc_js($current_file); ?>',
+                        nonce: htaccessData.nonce,
+                        editor_content: content
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            location.reload();
+                        } else {
+                            location.reload();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.log('Test AJAX error: ' + error);
+                        location.reload();
+                    }
+                });
+            });
+
+            // Restore Backup button handler
+            $('.restore-backup').on('click', function() {
+                var backupFile = $(this).data('file');
+                var targetFile = $(this).data('target');
+                if (confirm('Restore ' + backupFile + ' to ' + targetFile + ' .htaccess?')) {
+                    $.ajax({
+                        url: htaccessData.ajax_url,
+                        method: 'POST',
+                        data: {
+                            action: 'restore_backup',
+                            backup: backupFile,
+                            file: targetFile,
+                            nonce: htaccessData.restore_nonce
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                editor.setValue(response.content || '');
+                                location.reload();
+                            } else {
+                                location.reload();
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.log('Restore AJAX error: ' + error);
+                            location.reload();
+                        }
+                    });
+                }
+            });
+
+            // Delete Backup button handler
+            $('.delete-backup').on('click', function() {
+                var backupFile = $(this).data('file');
+                var targetFile = $(this).data('target');
+                if (confirm('Delete backup ' + backupFile + '? This action cannot be undone.')) {
+                    $.ajax({
+                        url: htaccessData.ajax_url,
+                        method: 'POST',
+                        data: {
+                            action: 'delete_backup',
+                            backup: backupFile,
+                            file: targetFile,
+                            nonce: htaccessData.delete_nonce
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                location.reload();
+                            } else {
+                                location.reload();
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.log('Delete AJAX error: ' + error);
+                            location.reload();
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+    <?php
+}
 
     public function ajax_test_htaccess() {
         if (!check_ajax_referer('htaccess_test_nonce', 'nonce', false)) {
@@ -646,17 +639,6 @@ class WP_HTAccess_Manager {
         $source_file = $file_type === 'admin' ? $this->admin_htaccess : $this->root_htaccess;
         $backup_suffix = $suffix ?: 'backup-' . date('Y-m-d_H-i-s');
         $backup_filename = $this->backup_dir . $file_type . '-htaccess-' . $backup_suffix . '.bak';
-        if (file_exists($source_file)) {
-            copy($source_file, $backup_filename);
-        }
-    }
-
-    private function backup_htaccess($file_type) {
-        if (!file_exists($this->backup_dir)) {
-            wp_mkdir_p($this->backup_dir);
-        }
-        $source_file = $file_type === 'admin' ? $this->admin_htaccess : $this->root_htaccess;
-        $backup_filename = $this->backup_dir . $file_type . '-htaccess-backup-' . date('Y-m-d_H-i-s') . '.bak';
         if (file_exists($source_file)) {
             copy($source_file, $backup_filename);
         }
@@ -832,11 +814,51 @@ class WP_HTAccess_Manager {
         return !empty($custom) ? implode("\n", $custom) : '';
     }
 
+    private function migrate_backups() {
+        $old_backup_dir = plugin_dir_path(__FILE__) . 'backups' . DIRECTORY_SEPARATOR;
+        if (file_exists($old_backup_dir)) {
+            $old_backups = glob($old_backup_dir . '*.bak');
+            foreach ($old_backups as $backup) {
+                $filename = basename($backup);
+                copy($backup, $this->backup_dir . $filename);
+            }
+        }
+    }
+
+    private function rotate_backups($file_type, $max_backups = 10) {
+        $backups = $this->get_backups($file_type);
+        if (count($backups) > $max_backups) {
+            usort($backups, function($a, $b) {
+                return filemtime($a) - filemtime($b);
+            });
+            $to_delete = array_slice($backups, 0, count($backups) - $max_backups);
+            foreach ($to_delete as $backup) {
+                unlink($backup);
+            }
+        }
+    }
+
     public static function activate() {
-        $backup_dir = plugin_dir_path(__FILE__) . 'backups' . DIRECTORY_SEPARATOR;
+        // Create backup directory in wp-content
+        $backup_dir = WP_CONTENT_DIR . DIRECTORY_SEPARATOR . 'htaccess-backups' . DIRECTORY_SEPARATOR;
         if (!file_exists($backup_dir)) {
             wp_mkdir_p($backup_dir);
+            
+            // Create .htaccess to protect the directory
+            $htaccess_content = "# Protect htaccess backups directory\n";
+            $htaccess_content .= "<Files ~ \"\.bak$\">\n";
+            $htaccess_content .= "    Order allow,deny\n";
+            $htaccess_content .= "    Deny from all\n";
+            $htaccess_content .= "</Files>\n";
+            $htaccess_content .= "# Disable directory browsing\n";
+            $htaccess_content .= "Options -Indexes\n";
+            
+            file_put_contents($backup_dir . '.htaccess', $htaccess_content);
+            
+            // Create empty index.php file for additional security
+            file_put_contents($backup_dir . 'index.php', '<?php // Silence is golden');
         }
+        
         $instance = new self();
         $instance->backup_htaccess('root', 'initial-' . date('Y-m-d_H-i-s'));
         $instance->backup_htaccess('admin', 'initial-' . date('Y-m-d_H-i-s'));

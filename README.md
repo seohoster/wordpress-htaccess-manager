@@ -1,3 +1,5 @@
+![Lee's .htaccess Manager](https://repository-images.githubusercontent.com/946958652/867ef4f7-8a60-48d0-9b62-23406c56fbcd)
+
 # Lee's .htaccess Manager
 
 - A secure, user-friendly WordPress plugin for managing .htaccess files.

@@ -75,10 +75,10 @@
 - Site owners troubleshooting server-level issues
 
 🔄 Changelog
-- Version 1.9.35
-- Moved backup directory to wp-content/htaccess-backups for enhanced security
+- Version 1.9.37
+- Fixed a htaccess rule issue regarding wp-login
+- Added nounce both JS and as a input element plus htaccess rule - prevents some cases of bruteforcing
 - Added directory protection for backup files
-- Implemented backup rotation to prevent excessive disk usage
 
 🔜 Upcoming Features
 - Settings page to toggle email notifications

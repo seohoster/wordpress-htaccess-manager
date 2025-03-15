@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Lee's .htaccess Manager by Magazinon.ro
  * Description: A lightweight plugin by Lee from Magazinon.ro to manage root and wp-admin .htaccess files with predefined blocks. Free to use, brought to you with love from Lee!
- * Version: 1.9.37
+ * Version: 1.9.38
  * Author: Lee @ <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>
  * License: GPL2
  *
@@ -54,6 +54,7 @@ class WP_HTAccess_Manager {
 
         // Add login nonce hook
         add_action('login_form', [$this, 'add_login_nonce_field']);
+        add_action('wp_authenticate', [$this, 'validate_login_nonce'], 1);
 
         $this->blocks = [
             'LSCACHE' => "# BEGIN LSCACHE\n\t# LiteSpeed Cache Optimization\n\t<IfModule LiteSpeed>\n\t\tCacheEnable public /\n\t\tRewriteEngine On\n\t\tRewriteRule .* - [E=cache-control:max-age=120]\n\t</IfModule>\n# END LSCACHE\n",
@@ -126,6 +127,15 @@ class WP_HTAccess_Manager {
         }
     }
 
+    public function validate_login_nonce() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['login_nonce'])) {
+            $nonce = sanitize_text_field($_GET['login_nonce']);
+            if (!wp_verify_nonce($nonce, 'login_nonce')) {
+                wp_die('Invalid login attempt. Please try again.', 'Forbidden', ['response' => 403]);
+            }
+        }
+    }
+
     /*
     public function add_login_nonce_field() { // Used togheter with the PREVENT_BRUTE_FORCE_WP_LOGIN rule
         $nonce = wp_create_nonce('login_nonce');
@@ -134,16 +144,32 @@ class WP_HTAccess_Manager {
         echo '<script>document.getElementById("loginform").action += "?login_nonce=' . esc_js($nonce) . '";</script>';
     }
     */
-
+    
     public function add_login_nonce_field() {
         $nonce = wp_create_nonce('login_nonce');
-        // Hidden field for potential server-side validation (optional)
         echo '<input type="hidden" name="login_nonce" value="' . esc_attr($nonce) . '" />';
-        // Modify form action server-side
         $action_url = esc_url(add_query_arg('login_nonce', $nonce, wp_login_url()));
         echo '<script>document.getElementById("loginform").action = "' . $action_url . '";</script>';
     }
-
+    
+/*  // not working as expected
+    public function add_login_nonce_field() {
+        wp_enqueue_script('jquery');
+        $nonce = wp_create_nonce('login_nonce');
+        echo '<input type="hidden" name="login_nonce" value="' . esc_attr($nonce) . '" />';
+        echo '<script>
+            jQuery(document).ready(function($) {
+                $("#loginform").attr("action", function(i, val) {
+                    return val + "?login_nonce=' . esc_js($nonce) . '";
+                });
+            });
+        </script>';
+        // Server-side fallback
+        add_filter('login_form_action', function($url) use ($nonce) {
+            return esc_url(add_query_arg('login_nonce', $nonce, $url));
+        }, 10, 1);
+    }
+*/
     private function check_permissions() {
         if (!current_user_can('manage_options')) {
             add_action('admin_notices', function() {

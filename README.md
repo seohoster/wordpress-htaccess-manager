@@ -1,6 +1,6 @@
 # Lee's .htaccess Manager
 
-A secure, user-friendly WordPress plugin for managing .htaccess files
+- A secure, user-friendly WordPress plugin for managing .htaccess files
 Lee's .htaccess Manager is a robust WordPress plugin designed to simplify the management of both root and wp-admin .htaccess files through an intuitive interface. Created with security and usability in mind, this plugin allows administrators to safely modify server configurations without risking site breakage.
 
 🛡️ Key Features

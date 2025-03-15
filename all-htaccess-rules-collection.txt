@@ -1,13 +1,4 @@
 # Note: WP_LOGIN_PASSWORD is excluded by default. Use it only for extreme password protection needs (requires .htpasswd setup).
-# BEGIN WP_LOGIN_PASSWORD
-#	# Password Protect wp-login.php
-#	<Files wp-login.php>
-#		AuthType Basic
-#		AuthName "Restricted Area"
-#		AuthUserFile localhost/iwpmanager/.htpasswd
-#		Require valid-user
-#	</Files>
-# END WP_LOGIN_PASSWORD
 
 # BEGIN LSCACHE
 	# LiteSpeed Cache Optimization
@@ -211,13 +202,13 @@ Options -Indexes
 # END DISABLE_PHP_WPCONTENT
 
 # BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN
-	# Prevent Brute Force on wp-login.php
-	<IfModule mod_rewrite.c>
-		RewriteCond %{REQUEST_METHOD} POST
-		RewriteCond %{REQUEST_URI} ^(.*)?wp-login\.php(.*)$
-		RewriteCond %{HTTP_COOKIE} !wordpress_logged_in [NC]
-		RewriteRule .* - [F,L]
-	</IfModule>
+    # Prevent Brute Force on wp-login.php with Nonce
+    <IfModule mod_rewrite.c>
+        RewriteCond %{REQUEST_METHOD} POST
+        RewriteCond %{REQUEST_URI} ^(.*)?wp-login\.php(.*)$
+        RewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]
+        RewriteRule .* - [F,L]
+    </IfModule>
 # END PREVENT_BRUTE_FORCE_WP_LOGIN
 
 # BEGIN FILE_SCRIPT_PROTECTION
@@ -232,14 +223,13 @@ Options -Indexes
 # The directives (lines) between "BEGIN WordPress" and "END WordPress" are
 # dynamically generated, and should only be modified via WordPress filters.
 # Any changes to the directives between these markers will be overwritten.
-<IfModule mod_rewrite.c>
-RewriteEngine On
-RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-RewriteBase /
-RewriteRule ^index\.php$ - [L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.php [L]
-</IfModule>
-
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+		RewriteBase /
+		RewriteRule ^index\.php$ - [L]
+		RewriteCond %{REQUEST_FILENAME} !-f
+		RewriteCond %{REQUEST_FILENAME} !-d
+		RewriteRule . /index.php [L]
+	</IfModule>
 # END WordPress

@@ -52,6 +52,9 @@ class WP_HTAccess_Manager {
         $this->backup_dir = WP_CONTENT_DIR . DIRECTORY_SEPARATOR . 'htaccess-backups' . DIRECTORY_SEPARATOR;
         $this->log_file = $this->backup_dir . 'htaccess_manager.log';
 
+        // Add login nonce hook
+        add_action('login_form', [$this, 'add_login_nonce_field']);
+
         $this->blocks = [
             'LSCACHE' => "# BEGIN LSCACHE\n\t# LiteSpeed Cache Optimization\n\t<IfModule LiteSpeed>\n\t\tCacheEnable public /\n\t\tRewriteEngine On\n\t\tRewriteRule .* - [E=cache-control:max-age=120]\n\t</IfModule>\n# END LSCACHE\n",
             'BROWSER_CACHE' => "# BEGIN BROWSER_CACHE\n\t# Enable Browser Caching\n\t<IfModule mod_expires.c>\n\t\tExpiresActive On\n\t\tExpiresByType image/jpg \"access plus 1 year\"\n\t\tExpiresByType image/jpeg \"access plus 1 year\"\n\t\tExpiresByType image/gif \"access plus 1 year\"\n\t\tExpiresByType image/png \"access plus 1 year\"\n\t\tExpiresByType text/css \"access plus 1 month\"\n\t\tExpiresByType application/javascript \"access plus 1 month\"\n\t</IfModule>\n# END BROWSER_CACHE\n",
@@ -77,7 +80,7 @@ class WP_HTAccess_Manager {
             'DISABLE_USER_ENUM' => "# BEGIN DISABLE_USER_ENUM\n\t# Disable User Enumeration\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteBase /\n\t\tRewriteCond %{QUERY_STRING} ^author=([0-9]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END DISABLE_USER_ENUM\n",
             'DISABLE_PHP_WPINCLUDES' => "# BEGIN DISABLE_PHP_WPINCLUDES\n\t# Disable PHP in wp-includes\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPINCLUDES\n",
             'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n\t# Disable PHP in wp-content (except plugins/themes)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPCONTENT\n",
-            'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Prevent Brute Force on wp-login.php\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{HTTP_COOKIE} !wordpress_logged_in [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Prevent Brute Force on wp-login.php with Nonce\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
             'FILE_SCRIPT_PROTECTION' => "# BEGIN FILE_SCRIPT_PROTECTION\n\t# Protect Sensitive Files and Block Hidden Files\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-content/uploads/.*\\.(log|bak|sql|zip)$ - [F]\n\t\tRewriteRule ^\\.(?!well-known).* - [F]\n\t</IfModule>\n# END FILE_SCRIPT_PROTECTION\n"
         ];
     
@@ -106,7 +109,7 @@ class WP_HTAccess_Manager {
             'DISABLE_USER_ENUM' => 'Prevents user enumeration via author query strings.',
             'DISABLE_PHP_WPINCLUDES' => 'Blocks PHP execution in wp-includes directory.',
             'DISABLE_PHP_WPCONTENT' => 'Blocks PHP execution in wp-content, except in plugins and themes.',
-            'PREVENT_BRUTE_FORCE_WP_LOGIN' => 'Blocks unauthenticated POST requests to wp-login.php to prevent brute force attacks.',
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => 'Blocks unauthorized POST requests to wp-login.php without a valid nonce, preventing brute force attacks.',
             'FILE_SCRIPT_PROTECTION' => 'Blocks access to sensitive file types in uploads and hidden files except .well-known.'
         ];
 
@@ -121,6 +124,13 @@ class WP_HTAccess_Manager {
         if (is_admin()) {
             $this->check_permissions();
         }
+    }
+
+    public function add_login_nonce_field() { // Used togheter with the PREVENT_BRUTE_FORCE_WP_LOGIN rule
+        $nonce = wp_create_nonce('login_nonce');
+        echo '<input type="hidden" name="login_nonce" value="' . esc_attr($nonce) . '" />';
+        // Add nonce to form action URL to make it visible to .htaccess
+        echo '<script>document.getElementById("loginform").action += "?login_nonce=' . esc_js($nonce) . '";</script>';
     }
 
     private function check_permissions() {

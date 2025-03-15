@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Lee's .htaccess Manager by Magazinon.ro
  * Description: A lightweight plugin by Lee from Magazinon.ro to manage root and wp-admin .htaccess files with predefined blocks. Free to use, brought to you with love from Lee!
- * Version: 1.9.35
+ * Version: 1.9.37
  * Author: Lee @ <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>
  * License: GPL2
  *
@@ -80,7 +80,7 @@ class WP_HTAccess_Manager {
             'DISABLE_USER_ENUM' => "# BEGIN DISABLE_USER_ENUM\n\t# Disable User Enumeration\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteBase /\n\t\tRewriteCond %{QUERY_STRING} ^author=([0-9]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END DISABLE_USER_ENUM\n",
             'DISABLE_PHP_WPINCLUDES' => "# BEGIN DISABLE_PHP_WPINCLUDES\n\t# Disable PHP in wp-includes\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPINCLUDES\n",
             'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n\t# Disable PHP in wp-content (except plugins/themes)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPCONTENT\n",
-            'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Prevent Brute Force on wp-login.php with Nonce\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Block unauthorized POSTs to wp-login.php without a nonce\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
             'FILE_SCRIPT_PROTECTION' => "# BEGIN FILE_SCRIPT_PROTECTION\n\t# Protect Sensitive Files and Block Hidden Files\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-content/uploads/.*\\.(log|bak|sql|zip)$ - [F]\n\t\tRewriteRule ^\\.(?!well-known).* - [F]\n\t</IfModule>\n# END FILE_SCRIPT_PROTECTION\n"
         ];
     
@@ -126,11 +126,22 @@ class WP_HTAccess_Manager {
         }
     }
 
+    /*
     public function add_login_nonce_field() { // Used togheter with the PREVENT_BRUTE_FORCE_WP_LOGIN rule
         $nonce = wp_create_nonce('login_nonce');
         echo '<input type="hidden" name="login_nonce" value="' . esc_attr($nonce) . '" />';
         // Add nonce to form action URL to make it visible to .htaccess
         echo '<script>document.getElementById("loginform").action += "?login_nonce=' . esc_js($nonce) . '";</script>';
+    }
+    */
+
+    public function add_login_nonce_field() {
+        $nonce = wp_create_nonce('login_nonce');
+        // Hidden field for potential server-side validation (optional)
+        echo '<input type="hidden" name="login_nonce" value="' . esc_attr($nonce) . '" />';
+        // Modify form action server-side
+        $action_url = esc_url(add_query_arg('login_nonce', $nonce, wp_login_url()));
+        echo '<script>document.getElementById("loginform").action = "' . $action_url . '";</script>';
     }
 
     private function check_permissions() {
@@ -701,35 +712,37 @@ class WP_HTAccess_Manager {
         if (!$this->validate_htaccess($content)) {
             return ['success' => false, 'message' => 'Invalid .htaccess syntax detected.'];
         }
-
+    
         $original_content = file_exists($file_to_test) ? file_get_contents($file_to_test) : '';
         $temp_backup = $this->backup_dir . 'test-backup-' . time() . '.bak';
-
+    
         if (!copy($file_to_test, $temp_backup)) {
             return ['success' => false, 'message' => 'Failed to create test backup.'];
         }
-
+    
         if (!file_put_contents($file_to_test, $content)) {
             unlink($temp_backup);
             return ['success' => false, 'message' => 'Failed to write test .htaccess.'];
         }
-
+    
         $test_url = $file_to_test === $this->root_htaccess ? home_url() : admin_url();
         $response = wp_remote_get($test_url, ['timeout' => 5, 'sslverify' => false]);
-
+    
         if (!copy($temp_backup, $file_to_test)) {
             error_log('WP HTAccess Manager: Failed to restore original .htaccess after test.');
         }
         unlink($temp_backup);
-
+    
         if (is_wp_error($response)) {
+            error_log('WP HTAccess Manager Test Error: ' . $response->get_error_message());
             return ['success' => false, 'message' => 'Test failed: ' . $response->get_error_message()];
         }
-
+    
         $status_code = wp_remote_retrieve_response_code($response);
         if ($status_code === 200) {
             return ['success' => true, 'message' => 'Rules tested successfully (HTTP 200).'];
         } else {
+            error_log("WP HTAccess Manager Test Failed: HTTP $status_code");
             return ['success' => false, 'message' => "Test returned HTTP $status_code. Check your rules."];
         }
     }

@@ -2,90 +2,132 @@
 
 # Lee's .htaccess Manager
 
-- A secure, user-friendly WordPress plugin for managing .htaccess files.
-- Lee's .htaccess Manager is a robust WordPress plugin designed to simplify the management of both root and wp-admin .htaccess files through an intuitive interface.
-- Created with security and usability in mind, this plugin allows administrators to safely modify server configurations without risking site breakage.
+A secure, user-friendly WordPress plugin for managing .htaccess files, created by Lee @ Magazinon.ro.
 
-🛡️ Key Features
-- Dual .htaccess Management: Edit both root and wp-admin .htaccess files from a single interface
-- Predefined Rule Blocks: 25+ ready-to-use configuration blocks for security, performance, and functionality
-- Syntax Validation: Prevents saving invalid configurations that could break your site
-- Live Testing: Test rules before applying them to ensure your site remains accessible
-- Comprehensive Backup System: Automatic backups stored securely in wp-content directory
-- Change Logging: Detailed logs of all modifications with timestamps and user information
-- CodeMirror Integration: Syntax highlighting for easier editing
-- One-Click Solutions: Add all recommended rules or reset to WordPress defaults with a single click
-- Visual Rule Indicators: Clearly shows which rule blocks are currently active
-- Email Notifications: Automatic alerts to admin email when .htaccess files are modified
+## 🛡️ Key Features
 
-🔒 Security Features
-- Protected Backup Location: Backups stored outside plugin directory in wp-content/htaccess-backups
-- Directory Protection: Backup directory secured with its own .htaccess rules
-- Permission Verification: Checks file permissions before allowing modifications
-- Nonce Verification: All forms and AJAX requests properly secured
-- User Capability Checks: Restricts access to administrators only
-- Input Sanitization: All inputs properly sanitized to prevent security issues
+- **Dual .htaccess Management**: Edit both root and wp-admin .htaccess files from a single interface
+- **30+ Predefined Rule Blocks**: Ready-to-use configuration blocks for security, performance, and functionality
+- **Advanced Security Features**: Brute force protection, nonce validation, rate limiting, and more
+- **Syntax Validation**: Prevents saving invalid configurations that could break your site
+- **Live Testing**: Test rules before applying them to ensure your site remains accessible
+- **Comprehensive Backup System**: Automatic backups stored securely in wp-content/htaccess-backups
+- **Change Logging**: Detailed logs of all modifications with timestamps and user information
+- **CodeMirror Integration**: Syntax highlighting for easier editing
+- **One-Click Solutions**: Add recommended rules or reset to WordPress defaults with a single click
+- **Visual Rule Indicators**: Clearly shows which rule blocks are currently active
+- **Email Notifications**: Automatic alerts to admin email when .htaccess files are modified
 
-📋 Predefined Rule Blocks
-- Browser caching optimization
-- GZIP compression
-- Security headers implementation
-- XML-RPC blocking
-- PHP execution restrictions
-- Directory browsing prevention
+## 🔒 Security Features
+
+- **Protected Backup Location**: Backups stored outside plugin directory in wp-content/htaccess-backups
+- **Directory Protection**: Backup directory secured with its own .htaccess rules
+- **Permission Verification**: Checks file permissions before allowing modifications
+- **Nonce Verification**: All forms and AJAX requests properly secured
+- **User Capability Checks**: Restricts access to administrators only
+- **Input Sanitization**: All inputs properly sanitized to prevent security issues
+- **Rate Limiting**: Built-in rate limiting for wp-admin access
+- **Login Protection**: Advanced brute force protection with nonce validation
+
+## 📋 Predefined Rule Blocks
+
+### Admin Security
+- IP-based access restrictions for wp-admin
+- HTTP Basic Authentication support
+- PHP execution controls
+- Directory listing prevention
+- Rate limiting implementation
 - HTTPS enforcement
-- AI bot blocking (GPTBot, ClaudeBot)
-- Hotlink protection
-- XSS and SQL injection protection
-- User enumeration prevention
-- And many more...
 
-💻 Technical Implementation
+### Performance
+- LiteSpeed Cache optimization
+- Browser caching configuration
+- GZIP compression
+- PHP performance tweaks
+- Upload size management
+
+### Security
+- wp-config.php protection
+- XML-RPC blocking
+- XSS and SQL injection protection
+- Hotlink prevention
+- AI bot blocking (GPTBot, ClaudeBot, Google-Extended)
+- User enumeration prevention
+- Hidden file protection
+- Sensitive file access control
+
+### Headers & Redirects
+- CORS configuration for fonts and assets
+- HSTS implementation
+- Security headers setup
+- WWW/non-WWW redirection
+- Force HTTPS
+
+### File Protection
+- PHP execution restrictions in uploads
+- Force download for specific file types
+- wp-includes protection
+- wp-content security rules
+
+## 💻 Technical Implementation
+
 - Clean, well-documented OOP code structure
 - WordPress coding standards compliance
-- Efficient backup rotation to prevent storage bloat
-- Graceful error handling with descriptive messages
-- Seamless integration with WordPress admin interface
-- Migration support for existing .htaccess configurations
+- Efficient backup rotation system
+- Graceful error handling
+- Seamless WordPress admin integration
+- Migration support for existing configurations
 
-🚀 Usage
-- Simply navigate to "Lee's .htaccess Manager" in your WordPress admin menu. The interface provides:
-- A tabbed editor for both root and wp-admin .htaccess files
-- Predefined rule blocks with hover descriptions
-- Testing functionality to validate changes before saving
-- Backup management with restore/delete options
-- Clear visual indicators of active rules
+## 🚀 Usage
 
-🔧 Installation
-- Upload the plugin to your /wp-content/plugins/ directory
-- Activate the plugin through the 'Plugins' menu in WordPress
-- Access the manager from the admin sidebar
-- Backups are automatically created in wp-content/htaccess-backups
+1. Navigate to "Lee's .htaccess Manager" in your WordPress admin menu
+2. Use the tabbed interface to edit root or wp-admin .htaccess
+3. Select from predefined rule blocks with hover descriptions
+4. Test changes before applying them
+5. Manage backups with restore/delete options
+6. Monitor active rules through visual indicators
 
-⚙️ Requirements
+## 🔧 Installation
+
+1. Upload the plugin to your /wp-content/plugins/ directory
+2. Activate the plugin through the 'Plugins' menu
+3. Access the manager from the admin sidebar
+4. Backups will be automatically created in wp-content/htaccess-backups
+
+## ⚙️ Requirements
+
 - WordPress 5.0 or higher
 - PHP 7.0 or higher
 - Apache web server with mod_rewrite enabled
 - Sufficient permissions to edit .htaccess files
 
-🌟 Perfect For
-- WordPress administrators who need to modify .htaccess without FTP access
+## 🌟 Perfect For
+
+- WordPress administrators managing server configurations
 - Security professionals implementing hardening measures
-- Developers optimizing site performance through server configurations
+- Developers optimizing site performance
 - Site owners troubleshooting server-level issues
 
-🔄 Changelog
-- Version 1.9.38
-- Fixed a htaccess rule issue regarding wp-login
-- Added directory protection for backup files
-- Fixed a nounce issue
+## 🔄 Changelog
 
-🔜 Upcoming Features
-- Settings page to toggle email notifications
+### Version 1.9.40
+- Added advanced brute force protection with nonce validation
+- Enhanced rate limiting functionality
+- Improved backup directory security
+- Added new AI bot blocking rules
+- Fixed login form nonce implementation
+- Added more predefined security rules
+
+## 🔜 Upcoming Features
+
+- Settings page for email notifications
 - Custom rule templates
-- Import/export functionality for .htaccess configurations
+- Import/export functionality
 - Enhanced rule conflict detection
+- Automated security scanning
 
-💬 Support
-- For questions, feature requests or bug reports, please open an issue on GitHub or visit Magazinon.ro for additional resources and support.
-- Created with ❤️ by Lee @ Magazinon.ro
+## 💬 Support
+
+For questions, feature requests or bug reports, please visit [Magazinon.ro](https://www.magazinon.ro) or open an issue on GitHub.
+
+Created with ❤️ by Lee @ Magazinon.ro

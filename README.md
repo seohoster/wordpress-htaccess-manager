@@ -128,6 +128,6 @@ A secure, user-friendly WordPress plugin for managing .htaccess files, created b
 
 ## 💬 Support
 
-For questions, feature requests or bug reports, please visit [Magazinon.ro](https://www.magazinon.ro) or open an issue on GitHub.
+For questions, feature requests or bug reports open an issue on GitHub.
 
 Created with ❤️ by Lee @ Magazinon.ro

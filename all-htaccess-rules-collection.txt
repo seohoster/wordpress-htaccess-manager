@@ -233,3 +233,57 @@ Options -Indexes
 		RewriteRule . /index.php [L]
 	</IfModule>
 # END WordPress
+
+
+
+#######################################################################
+### WP-ADMIN RULES #####################################
+#######################################################################
+
+# BEGIN ADMIN_RATE_LIMIT
+	# Basic rate-limiting for wp-admin
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{REQUEST_URI} ^/wp-admin/.*$
+		RewriteCond %{HTTP_COOKIE} !rate_limit_exempt=1 [NC]
+		RewriteRule .* - [R=429,L]
+	</IfModule>
+# END ADMIN_RATE_LIMIT
+
+# BEGIN ADMIN_NO_INDEX
+Options -Indexes
+# END ADMIN_NO_INDEX
+
+# BEGIN ADMIN_BLOCK_PHP
+	# Block non-existent PHP files in wp-admin
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} !-f
+		RewriteRule \.php$ - [F,L]
+	</IfModule>
+# END ADMIN_BLOCK_PHP
+
+# BEGIN ADMIN_BASIC_AUTH
+	# Password protect wp-admin
+	AuthType Basic
+	AuthName "Admin Restricted Area"
+	AuthUserFile .htpasswd
+	Require valid-user
+	# Allow AJAX requests without auth
+	<Files "admin-ajax.php">
+		Order allow,deny
+		Allow from all
+		Satisfy any
+	</Files>
+# END ADMIN_BASIC_AUTH
+
+# BEGIN ADMIN_IP_RESTRICT
+	# Restrict wp-admin to specific IPs
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{REMOTE_ADDR} !^127\.0\.0\.1$ [NC]
+		# Add more IPs below as needed (e.g., RewriteCond %{REMOTE_ADDR} !^203\.0\.113\.50$)
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END ADMIN_IP_RESTRICT
+

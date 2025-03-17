@@ -43,112 +43,120 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-public function __construct() {
-    $this->root_htaccess = rtrim(ABSPATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.htaccess';
-    $this->admin_htaccess = rtrim(ABSPATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'wp-admin' . DIRECTORY_SEPARATOR . '.htaccess';
+class WP_HTAccess_Manager {
+    private $root_htaccess;
+    private $admin_htaccess;
+    private $backup_dir;
+    private $log_file;
+    private $blocks;
+    private $block_descriptions;
+
+    public function __construct() {
+        $this->root_htaccess = rtrim(ABSPATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.htaccess';
+        $this->admin_htaccess = rtrim(ABSPATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'wp-admin' . DIRECTORY_SEPARATOR . '.htaccess';
+        
+        // New backup directory location outside plugin folder
+        $this->backup_dir = WP_CONTENT_DIR . DIRECTORY_SEPARATOR . 'htaccess-backups' . DIRECTORY_SEPARATOR;
+        $this->log_file = $this->backup_dir . 'htaccess_manager.log';
     
-    // New backup directory location outside plugin folder
-    $this->backup_dir = WP_CONTENT_DIR . DIRECTORY_SEPARATOR . 'htaccess-backups' . DIRECTORY_SEPARATOR;
-    $this->log_file = $this->backup_dir . 'htaccess_manager.log';
-
-    // Add login nonce hook
-    add_action('login_form', [$this, 'add_login_nonce_field']);
-    add_action('wp_authenticate', [$this, 'validate_login_nonce'], 1);
-    add_action('admin_init', [$this, 'set_rate_limit_cookie']);
-
-    $this->blocks = [
-        // Admin-Specific Blocks
-        'ADMIN_IP_RESTRICT' => "# BEGIN ADMIN_IP_RESTRICT\n\t# Restrict wp-admin to specific IPs\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{REMOTE_ADDR} !^127\\.0\\.0\\.1$ [NC]\n\t\t# Add more IPs below as needed (e.g., RewriteCond %{REMOTE_ADDR} !^203\\.0\\.113\\.50$)\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END ADMIN_IP_RESTRICT\n",
-        'ADMIN_BASIC_AUTH' => "# BEGIN ADMIN_BASIC_AUTH\n\t# Password protect wp-admin\n\tAuthType Basic\n\tAuthName \"Admin Restricted Area\"\n\tAuthUserFile {{HOME_PATH}}/.htpasswd\n\tRequire valid-user\n\t# Allow AJAX requests without auth\n\t<Files \"admin-ajax.php\">\n\t\tOrder allow,deny\n\t\tAllow from all\n\t\tSatisfy any\n\t</Files>\n# END ADMIN_BASIC_AUTH\n",
-        'ADMIN_BLOCK_PHP' => "# BEGIN ADMIN_BLOCK_PHP\n\t# Block non-existent PHP files in wp-admin\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} !-f\n\t\tRewriteRule \\.php$ - [F,L]\n\t</IfModule>\n# END ADMIN_BLOCK_PHP\n",
-        'ADMIN_NO_INDEX' => "# BEGIN ADMIN_NO_INDEX\nOptions -Indexes\n# END ADMIN_NO_INDEX\n",
-        'ADMIN_RATE_LIMIT' => "# BEGIN ADMIN_RATE_LIMIT\n\t# Basic rate-limiting for wp-admin\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{REQUEST_URI} ^/wp-admin/.*$\n\t\tRewriteCond %{HTTP_COOKIE} !rate_limit_exempt=1 [NC]\n\t\tRewriteRule .* - [R=429,L]\n\t</IfModule>\n# END ADMIN_RATE_LIMIT\n",
-        'ADMIN_HTTPS' => "# BEGIN ADMIN_HTTPS\n\t# Force HTTPS for wp-admin\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTPS} !=on\n\t\tRewriteRule ^(.*)$ https://%{HTTP_HOST}/wp-admin/$1 [R=301,L]\n\t</IfModule>\n# END ADMIN_HTTPS\n",
-        'BLOCK_BAD_BOTS' => "# BEGIN BLOCK_BAD_BOTS\n\t# Block known bad bots site-wide\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_USER_AGENT} (abot|aipbot|asterias|EI|libwww-perl|LWP|lwp|MSIECrawler|nameprotect|PlantyNet_WebRobot|UCmore|Alligator|AllSubmitter|Anonymous|Asterias|autoemailspider|Badass|Baiduspider|BecomeBot|Bitacle|bladder\\ fusion|Blogshares\\ Spiders|Board\\ Bot|Convera|ConveraMultiMediaCrawler|c-spider|DA|DnloadMage|Download\\ Demon|Download\\ Express|Download\\ Wonder|dragonfly|DreamPassport|DSurf|DTS\\ Agent|EBrowse|eCatch|edgeio|Email\\ Extractor|EmailSiphon|EmailWolf|EmeraldShield|ESurf|Exabot|ExtractorPro|FileHeap!\\ file\\ downloader|FileHound|Forex|Franklin\\ Locator|FreshDownload|FrontPage|FSurf|Gaisbot|Gamespy_Arcade|genieBot|GetBot|GetRight|Gigabot|Go!Zilla|Go-Ahead-Got-It|GOFORITBOT|heritrix|HLoader|HooWWWer|HTTrack|iCCrawler|ichiro|iGetter|imds_monitor|Industry\\ Program|Indy\\ Library|InetURL|InstallShield\\ DigitalWizard|IRLbot|IUPUI\\ Research\\ Bot|Java|jeteye|jeteyebot|JoBo|JOC\\ Web\\ Spider|Kapere|Larbin|LeechGet|LightningDownload|Linkie|Mac\\ Finder|Mail\\ Sweeper|Mass\\ Downloader|MetaProducts\\ Download\\ Express|Microsoft\\ Data\\ Access|Microsoft\\ URL\\ Control|Missauga\\ Locate|Missauga\\ Locator|Missigua\\ Locator|Missouri\\ College\\ Browse|Mister\\ PiX|MovableType|Mozi!|Mozilla\\/3\\.0\\ \\(compatible\\)|Mozilla\\/5\\.0\\ \\(compatible;\\ MSIE\\ 5\\.0\\)|MSIE_6\\.0|MSIECrawler|MVAClient|MyFamilyBot|MyGetRight|NASA\\ Search|Naver|NaverBot|NetAnts|NetResearchServer|NEWT\\ ActiveX|Nextopia|NICErsPRO|NimbleCrawler|Nitro\\ Downloader|Nutch|Offline\\ Explorer|OmniExplorer|OutfoxBot|P3P|PagmIEDownload|pavuk|PHP\\ version|playstarmusic|Program\\ Shareware|Progressive\\ Download|psycheclone|puf|PussyCat|PuxaRapido|Python-urllib|RealDownload|RedKernel|relevantnoise|RepoMonkey\\ Bait\\ &\\ Tackle|RTG30|SBIder|script|Seekbot|SiteSnagger|SmartDownload|sna-|Snap\\ bot|SpeedDownload|Sphere|sproose|SQ\\ Webscanner|Stamina|Star\\ Downloader|Teleport|TurnitinBot|UdmSearch|URLGetFile|User-Agent|UtilMind\\ HTTPGet|WebAuto|WebCapture|webcollage|WebCopier|WebFilter|WebReaper|Website\\ eXtractor|WebStripper|WebZIP|Wells\\ Search|WEP\\ Search\\ 00|Wget|Wildsoft\\ Surfer|WinHttpRequest|WWWOFFLE|Xaldon\\ WebSpider|Y!TunnelPro|YahooYSMcm|Zade|ZBot|zerxbot) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END BLOCK_BAD_BOTS\n",
-        'BLOCK_AI_BOTS' => "# BEGIN BLOCK_AI_BOTS\n\t# Block AI Scraping Bots\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_USER_AGENT} (CCBot|ChatGPT|GPTBot|anthropic-ai|Omgilibot|Omgili|FacebookBot|Diffbot|Bytespider|ImagesiftBot|cohere-ai|ClaudeBot) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END BLOCK_AI_BOTS\n",
-        'LSCACHE' => "# BEGIN LSCACHE\n\t# LiteSpeed Cache Optimization\n\t<IfModule LiteSpeed>\n\t\tCacheEnable public /\n\t\tRewriteEngine On\n\t\tRewriteRule .* - [E=cache-control:max-age=120]\n\t</IfModule>\n# END LSCACHE\n",
-        'BROWSER_CACHE' => "# BEGIN BROWSER_CACHE\n\t# Enable Browser Caching\n\t<IfModule mod_expires.c>\n\t\tExpiresActive On\n\t\tExpiresByType image/jpg \"access plus 1 year\"\n\t\tExpiresByType image/jpeg \"access plus 1 year\"\n\t\tExpiresByType image/gif \"access plus 1 year\"\n\t\tExpiresByType image/png \"access plus 1 year\"\n\t\tExpiresByType text/css \"access plus 1 month\"\n\t\tExpiresByType application/javascript \"access plus 1 month\"\n\t</IfModule>\n# END BROWSER_CACHE\n",
-        'GZIP_COMPRESSION' => "# BEGIN GZIP_COMPRESSION\n\t# Enable GZIP Compression\n\t<IfModule mod_deflate.c>\n\t\tAddOutputFilterByType DEFLATE text/html\n\t\tAddOutputFilterByType DEFLATE text/css\n\t\tAddOutputFilterByType DEFLATE application/javascript\n\t\tBrowserMatch ^Mozilla/4 gzip-only-text/html\n\t\tBrowserMatch ^Mozilla/4\\.0[678] no-gzip\n\t\tBrowserMatch \\bMSIE !no-gzip !gzip-only-text/html\n\t</IfModule>\n# END GZIP_COMPRESSION\n",
-        'SECURITY_WP_CONFIG' => "# BEGIN SECURITY_WP_CONFIG\n\t# Block Access to wp-config.php\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-config\\.php$ - [F,L]\n\t</IfModule>\n# END SECURITY_WP_CONFIG\n",
-        'BLOCK_XMLRPC' => "# BEGIN BLOCK_XMLRPC\n\t# Block XML-RPC\n\t<Files xmlrpc.php>\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</Files>\n# END BLOCK_XMLRPC\n",
-        'SECURITY_NO_INDEX' => "# BEGIN SECURITY_NO_INDEX\nOptions -Indexes\n# END SECURITY_NO_INDEX\n",
-        'SECURITY_HT_FILES' => "# BEGIN SECURITY_HT_FILES\n\t# Block Access to .htaccess and .htpasswd\n\t<FilesMatch \"^\\.(htaccess|htpasswd)$\">\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</FilesMatch>\n# END SECURITY_HT_FILES\n",
-        'REDIRECT_HTTPS' => "# BEGIN REDIRECT_HTTPS\n\t# Force HTTPS\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTPS} !=on\n\t\tRewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_HTTPS\n",
-        'WP_LOGIN_PASSWORD' => "# BEGIN WP_LOGIN_PASSWORD\n\t# Password Protect wp-login.php\n\t<Files wp-login.php>\n\t\tAuthType Basic\n\t\tAuthName \"Restricted Area\"\n\t\tAuthUserFile {{HOME_URL}}/.htpasswd\n\t\tRequire valid-user\n\t</Files>\n# END WP_LOGIN_PASSWORD\n",
-        'CORS_ORIGIN' => "# BEGIN CORS_ORIGIN\n\t# Fix CORS for Fonts and Assets\n\t<IfModule mod_headers.c>\n\t\t<FilesMatch \"\\.(ttf|otf|eot|woff|woff2)$\">\n\t\t\tHeader set Access-Control-Allow-Origin \"*\"\n\t\t</FilesMatch>\n\t</IfModule>\n# END CORS_ORIGIN\n",
-        'PHP_TWEAKS' => "# BEGIN PHP_TWEAKS\n\tphp_value upload_max_filesize 20M\n\tphp_value post_max_size 20M\n\tphp_value memory_limit 256M\n# END PHP_TWEAKS\n",
-        'MOD_SECURITY' => "# BEGIN MOD_SECURITY\n\t# Enable ModSecurity\n\t<IfModule mod_security.c>\n\t\tSecFilterEngine On\n\t\tSecFilterScanPOST On\n\t</IfModule>\n# END MOD_SECURITY\n",
-        'BLOCK_XSS_UA' => "# BEGIN BLOCK_XSS_UA\n\t# Block XSS attacks and malicious User-Agents\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\t# XSS: Query string patterns\n\t\tRewriteCond %{QUERY_STRING} (<|%3C).*?(script|img|onerror|alert)[^>]*>|javascript:|alert\\( [NC,OR]\n\t\t# XSS: POST body patterns\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{THE_REQUEST} (<|%3C).*?(script|img|onerror|alert)[^>]*> [NC,OR]\n\t\t# Malicious User-Agents\n\t\tRewriteCond %{HTTP_USER_AGENT} (libwww-perl|wget|curl|nikto|sqlmap) [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_XSS_UA\n",
-        'HOTLINK_PROTECTION' => "# BEGIN HOTLINK_PROTECTION\n\t# Prevent Hotlinking (bypassed on localhost)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_HOST} !^(localhost|127\\.0\\.0\\.1)$ [NC]\n\t\tRewriteCond %{HTTP_REFERER} !^$\n\t\tRewriteCond %{HTTP_REFERER} !^https?://(www\\.)?{{HOME_URL}}/ [NC]\n\t\tRewriteRule \\.(jpg|jpeg|png|gif|webp|pdf|svg)$ - [F,L]\n\t</IfModule>\n# END HOTLINK_PROTECTION\n",
-        'LIMIT_UPLOAD_SIZE' => "# BEGIN LIMIT_UPLOAD_SIZE\n\tphp_value upload_max_filesize 10M\n\tphp_value post_max_size 10M\n# END LIMIT_UPLOAD_SIZE\n",
-        'DISABLE_PHP_UPLOADS' => "# BEGIN DISABLE_PHP_UPLOADS\n\t# Disable PHP in wp-content/uploads\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/uploads/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_UPLOADS\n",
-        'FORCE_DOWNLOAD' => "# BEGIN FORCE_DOWNLOAD\n\t# Force Downloads for Certain File Types\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule \\.(pdf|zip|rar)$ - [R=302,L]\n\t</IfModule>\n# END FORCE_DOWNLOAD\n",
-        'REDIRECT_WWW' => "# BEGIN REDIRECT_WWW\n\t# Force non-www\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\n\t\tRewriteRule ^(.*)$ https://%1/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_WWW\n",
-        'HSTS_HEADER' => "# BEGIN HSTS_HEADER\n\t# Enable HSTS\n\t<IfModule mod_headers.c>\n\t\tHeader set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" env=HTTPS\n\t</IfModule>\n# END HSTS_HEADER\n",
-        'SECURITY_HEADERS' => "# BEGIN SECURITY_HEADERS\n\t# Additional Security Headers\n\t<IfModule mod_headers.c>\n\t\tHeader set X-XSS-Protection \"1; mode=block\"\n\t\tHeader set X-Content-Type-Options \"nosniff\"\n\t\tHeader set X-Permitted-Cross-Domain-Policies \"none\"\n\t\tHeader set X-Frame-Options \"SAMEORIGIN\"\n\t\tHeader set Referrer-Policy \"no-referrer-when-downgrade\"\n\t</IfModule>\n# END SECURITY_HEADERS\n",
-        'DISABLE_USER_ENUM' => "# BEGIN DISABLE_USER_ENUM\n\t# Disable User Enumeration\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteBase /\n\t\tRewriteCond %{QUERY_STRING} ^author=([0-9]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END DISABLE_USER_ENUM\n",
-        'DISABLE_PHP_WPINCLUDES' => "# BEGIN DISABLE_PHP_WPINCLUDES\n\t# Disable PHP in wp-includes\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPINCLUDES\n",
-        'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n\t# Disable PHP in wp-content (except plugins/themes)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPCONTENT\n",
-        'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Block unauthorized POSTs to wp-login.php without a nonce\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
-        'FILE_SCRIPT_PROTECTION' => "# BEGIN FILE_SCRIPT_PROTECTION\n\t# Protect Sensitive Files and Block Hidden Files\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-content/uploads/.*\\.(log|bak|sql|zip)$ - [F]\n\t\tRewriteRule ^\\.(?!well-known).* - [F]\n\t</IfModule>\n# END FILE_SCRIPT_PROTECTION\n",
-        'BLOCK_DIR_TRAVERSAL' => "# BEGIN BLOCK_DIR_TRAVERSAL\n\t# Block Directory Traversal attacks\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (\.\./|\.\.%2f) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)template_path=.*\.\./.*$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)progressfile=.*\.\./.*$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_DIR_TRAVERSAL\n",
-        'BLOCK_SQL_INJECTION' => "# BEGIN BLOCK_SQL_INJECTION\n\t# Block SQL Injection attacks with comprehensive query string patterns\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval|sleep|\-\-|\#) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)id=.*(union|select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)country_id=.*(select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)columns=.*(select|sleep).* [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_SQL_INJECTION\n",
-        'BLOCK_MALICIOUS_UPLOAD' => "# BEGIN BLOCK_MALICIOUS_UPLOAD\n\t# Block malicious file inclusion or upload attempts via query string\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (^|&)file=.*\.(php|phtml|phps)$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_MALICIOUS_UPLOAD\n",
-        'BLOCK_LFI' => "# BEGIN BLOCK_LFI\n\t# Block Local File Inclusion (LFI) attacks\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)file=.*etc/passwd$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_LFI\n",
-    ];
-
-    $this->block_descriptions = [
-        'ADMIN_IP_RESTRICT' => 'Restricts wp-admin access to specific IP addresses (default: 127.0.0.1 for localhost). Edit IPs in the rule.',
-        'ADMIN_BASIC_AUTH' => 'Adds HTTP Basic Authentication to wp-admin, requiring a username/password from an .htpasswd file. Exempts admin-ajax.php.',
-        'ADMIN_BLOCK_PHP' => 'Blocks PHP files in wp-admin that don’t exist, like random.php, with a 403 error. Lets real admin files, like users.php, work normally.',
-        'ADMIN_NO_INDEX' => 'Prevents directory listing in wp-admin.',
-        'ADMIN_RATE_LIMIT' => 'Basic rate-limiting for wp-admin requests; requires a cookie (rate_limit_exempt=1) to bypass (needs PHP support).',
-        'ADMIN_HTTPS' => 'Forces HTTPS for wp-admin only, redirecting HTTP requests to HTTPS.',
-        'BLOCK_BAD_BOTS' => 'Blocks known bad bots (e.g., scrapers, downloaders) from the entire site by checking their User-Agent, denying access with a 403 error.',
-        'BLOCK_AI_BOTS' => 'Blocks AI scraping bots like CCBot, ChatGPT, GPTBot, and others from the entire site with a 403 error.',
-        'LSCACHE' => 'Optimizes caching for LiteSpeed servers.',
-        'BROWSER_CACHE' => 'Enables browser caching for static assets like images and scripts.',
-        'GZIP_COMPRESSION' => 'Compresses content to speed up page loads.',
-        'SECURITY_WP_CONFIG' => 'Blocks access to wp-config.php.',
-        'BLOCK_XMLRPC' => 'Disables XML-RPC to prevent brute-force attacks.',
-        'SECURITY_NO_INDEX' => 'Prevents directory listing.',
-        'SECURITY_HT_FILES' => 'Blocks access to .htaccess and similar files.',
-        'REDIRECT_HTTPS' => 'Forces all traffic to HTTPS.',
-        'WP_LOGIN_PASSWORD' => 'Adds password protection to wp-login.php (requires .htpasswd).',
-        'CORS_ORIGIN' => 'Fixes CORS issues for fonts and assets.',
-        'PHP_TWEAKS' => 'Adjusts PHP settings for better performance.',
-        'MOD_SECURITY' => 'Enables ModSecurity filters for extra protection.',
-        'BLOCK_XSS_UA' => 'Blocks XSS attacks (query strings and POST bodies) and malicious User-Agents.',
-        'HOTLINK_PROTECTION' => 'Prevents other sites from hotlinking your files (disabled on localhost).',
-        'LIMIT_UPLOAD_SIZE' => 'Caps upload size at 10MB to prevent abuse.',
-        'DISABLE_PHP_UPLOADS' => 'Blocks PHP execution in wp-content/uploads.',
-        'FORCE_DOWNLOAD' => 'Forces downloads for PDFs, ZIPs, and RARs.',
-        'REDIRECT_WWW' => 'Forces non-www URLs (toggleable to www).',
-        'HSTS_HEADER' => 'Enforces HTTPS with HSTS for a year, with preload support.',
-        'SECURITY_HEADERS' => 'Adds security headers to protect against common web vulnerabilities.',
-        'DISABLE_USER_ENUM' => 'Prevents user enumeration via author query strings.',
-        'DISABLE_PHP_WPINCLUDES' => 'Blocks PHP execution in wp-includes directory.',
-        'DISABLE_PHP_WPCONTENT' => 'Blocks PHP execution in wp-content, except in plugins and themes.',
-        'PREVENT_BRUTE_FORCE_WP_LOGIN' => 'Blocks unauthorized POST requests to wp-login.php without a valid nonce, preventing brute force attacks.',
-        'FILE_SCRIPT_PROTECTION' => 'Blocks access to sensitive file types in uploads and hidden files except .well-known.',
-        'BLOCK_DIR_TRAVERSAL' => 'Blocks Directory Traversal attacks by detecting ../ sequences and specific file access attempts (e.g., /etc/passwd).',
-        'BLOCK_SQL_INJECTION' => 'Blocks SQL Injection attacks by detecting malicious patterns and specific parameter exploits in query strings.',
-        'BLOCK_MALICIOUS_UPLOAD' => 'Blocks malicious file inclusion attempts via query string parameters (e.g., file=evil.php).',
-        'BLOCK_LFI' => 'Blocks Local File Inclusion (LFI) attacks by detecting attempts to include sensitive files like /etc/passwd.',
-    ];
-
-    add_action('admin_menu', [$this, 'add_admin_page']);
-    add_action('admin_init', [$this, 'handle_form_submission']);
-    add_action('admin_enqueue_scripts', [$this, 'load_admin_assets']);
-    add_action('wp_ajax_test_htaccess', [$this, 'ajax_test_htaccess']);
-    add_action('wp_ajax_restore_backup', [$this, 'ajax_restore_backup']);
-    add_action('wp_ajax_backup_htaccess', [$this, 'ajax_backup_htaccess']);
-    add_action('wp_ajax_delete_backup', [$this, 'ajax_delete_backup']);
-    add_action('admin_notices', [$this, 'display_admin_notices']);
-    if (is_admin()) {
-        $this->check_permissions();
+        // Add login nonce hook
+        add_action('login_form', [$this, 'add_login_nonce_field']);
+        add_action('wp_authenticate', [$this, 'validate_login_nonce'], 1);
+        add_action('admin_init', [$this, 'set_rate_limit_cookie']);
+    
+        $this->blocks = [
+            // Admin-Specific Blocks
+            'ADMIN_IP_RESTRICT' => "# BEGIN ADMIN_IP_RESTRICT\n\t# Restrict wp-admin to specific IPs\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{REMOTE_ADDR} !^127\\.0\\.0\\.1$ [NC]\n\t\t# Add more IPs below as needed (e.g., RewriteCond %{REMOTE_ADDR} !^203\\.0\\.113\\.50$)\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END ADMIN_IP_RESTRICT\n",
+            'ADMIN_BASIC_AUTH' => "# BEGIN ADMIN_BASIC_AUTH\n\t# Password protect wp-admin\n\tAuthType Basic\n\tAuthName \"Admin Restricted Area\"\n\tAuthUserFile {{HOME_PATH}}/.htpasswd\n\tRequire valid-user\n\t# Allow AJAX requests without auth\n\t<Files \"admin-ajax.php\">\n\t\tOrder allow,deny\n\t\tAllow from all\n\t\tSatisfy any\n\t</Files>\n# END ADMIN_BASIC_AUTH\n",
+            'ADMIN_BLOCK_PHP' => "# BEGIN ADMIN_BLOCK_PHP\n\t# Block non-existent PHP files in wp-admin\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} !-f\n\t\tRewriteRule \\.php$ - [F,L]\n\t</IfModule>\n# END ADMIN_BLOCK_PHP\n",
+            'ADMIN_NO_INDEX' => "# BEGIN ADMIN_NO_INDEX\nOptions -Indexes\n# END ADMIN_NO_INDEX\n",
+            'ADMIN_RATE_LIMIT' => "# BEGIN ADMIN_RATE_LIMIT\n\t# Basic rate-limiting for wp-admin\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{REQUEST_URI} ^/wp-admin/.*$\n\t\tRewriteCond %{HTTP_COOKIE} !rate_limit_exempt=1 [NC]\n\t\tRewriteRule .* - [R=429,L]\n\t</IfModule>\n# END ADMIN_RATE_LIMIT\n",
+            'ADMIN_HTTPS' => "# BEGIN ADMIN_HTTPS\n\t# Force HTTPS for wp-admin\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTPS} !=on\n\t\tRewriteRule ^(.*)$ https://%{HTTP_HOST}/wp-admin/$1 [R=301,L]\n\t</IfModule>\n# END ADMIN_HTTPS\n",
+            'BLOCK_BAD_BOTS' => "# BEGIN BLOCK_BAD_BOTS\n\t# Block known bad bots site-wide\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_USER_AGENT} (abot|aipbot|asterias|EI|libwww-perl|LWP|lwp|MSIECrawler|nameprotect|PlantyNet_WebRobot|UCmore|Alligator|AllSubmitter|Anonymous|Asterias|autoemailspider|Badass|Baiduspider|BecomeBot|Bitacle|bladder\\ fusion|Blogshares\\ Spiders|Board\\ Bot|Convera|ConveraMultiMediaCrawler|c-spider|DA|DnloadMage|Download\\ Demon|Download\\ Express|Download\\ Wonder|dragonfly|DreamPassport|DSurf|DTS\\ Agent|EBrowse|eCatch|edgeio|Email\\ Extractor|EmailSiphon|EmailWolf|EmeraldShield|ESurf|Exabot|ExtractorPro|FileHeap!\\ file\\ downloader|FileHound|Forex|Franklin\\ Locator|FreshDownload|FrontPage|FSurf|Gaisbot|Gamespy_Arcade|genieBot|GetBot|GetRight|Gigabot|Go!Zilla|Go-Ahead-Got-It|GOFORITBOT|heritrix|HLoader|HooWWWer|HTTrack|iCCrawler|ichiro|iGetter|imds_monitor|Industry\\ Program|Indy\\ Library|InetURL|InstallShield\\ DigitalWizard|IRLbot|IUPUI\\ Research\\ Bot|Java|jeteye|jeteyebot|JoBo|JOC\\ Web\\ Spider|Kapere|Larbin|LeechGet|LightningDownload|Linkie|Mac\\ Finder|Mail\\ Sweeper|Mass\\ Downloader|MetaProducts\\ Download\\ Express|Microsoft\\ Data\\ Access|Microsoft\\ URL\\ Control|Missauga\\ Locate|Missauga\\ Locator|Missigua\\ Locator|Missouri\\ College\\ Browse|Mister\\ PiX|MovableType|Mozi!|Mozilla\\/3\\.0\\ \\(compatible\\)|Mozilla\\/5\\.0\\ \\(compatible;\\ MSIE\\ 5\\.0\\)|MSIE_6\\.0|MSIECrawler|MVAClient|MyFamilyBot|MyGetRight|NASA\\ Search|Naver|NaverBot|NetAnts|NetResearchServer|NEWT\\ ActiveX|Nextopia|NICErsPRO|NimbleCrawler|Nitro\\ Downloader|Nutch|Offline\\ Explorer|OmniExplorer|OutfoxBot|P3P|PagmIEDownload|pavuk|PHP\\ version|playstarmusic|Program\\ Shareware|Progressive\\ Download|psycheclone|puf|PussyCat|PuxaRapido|Python-urllib|RealDownload|RedKernel|relevantnoise|RepoMonkey\\ Bait\\ &\\ Tackle|RTG30|SBIder|script|Seekbot|SiteSnagger|SmartDownload|sna-|Snap\\ bot|SpeedDownload|Sphere|sproose|SQ\\ Webscanner|Stamina|Star\\ Downloader|Teleport|TurnitinBot|UdmSearch|URLGetFile|User-Agent|UtilMind\\ HTTPGet|WebAuto|WebCapture|webcollage|WebCopier|WebFilter|WebReaper|Website\\ eXtractor|WebStripper|WebZIP|Wells\\ Search|WEP\\ Search\\ 00|Wget|Wildsoft\\ Surfer|WinHttpRequest|WWWOFFLE|Xaldon\\ WebSpider|Y!TunnelPro|YahooYSMcm|Zade|ZBot|zerxbot) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END BLOCK_BAD_BOTS\n",
+            'BLOCK_AI_BOTS' => "# BEGIN BLOCK_AI_BOTS\n\t# Block AI Scraping Bots\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_USER_AGENT} (CCBot|ChatGPT|GPTBot|anthropic-ai|Omgilibot|Omgili|FacebookBot|Diffbot|Bytespider|ImagesiftBot|cohere-ai|ClaudeBot) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END BLOCK_AI_BOTS\n",
+            'LSCACHE' => "# BEGIN LSCACHE\n\t# LiteSpeed Cache Optimization\n\t<IfModule LiteSpeed>\n\t\tCacheEnable public /\n\t\tRewriteEngine On\n\t\tRewriteRule .* - [E=cache-control:max-age=120]\n\t</IfModule>\n# END LSCACHE\n",
+            'BROWSER_CACHE' => "# BEGIN BROWSER_CACHE\n\t# Enable Browser Caching\n\t<IfModule mod_expires.c>\n\t\tExpiresActive On\n\t\tExpiresByType image/jpg \"access plus 1 year\"\n\t\tExpiresByType image/jpeg \"access plus 1 year\"\n\t\tExpiresByType image/gif \"access plus 1 year\"\n\t\tExpiresByType image/png \"access plus 1 year\"\n\t\tExpiresByType text/css \"access plus 1 month\"\n\t\tExpiresByType application/javascript \"access plus 1 month\"\n\t</IfModule>\n# END BROWSER_CACHE\n",
+            'GZIP_COMPRESSION' => "# BEGIN GZIP_COMPRESSION\n\t# Enable GZIP Compression\n\t<IfModule mod_deflate.c>\n\t\tAddOutputFilterByType DEFLATE text/html\n\t\tAddOutputFilterByType DEFLATE text/css\n\t\tAddOutputFilterByType DEFLATE application/javascript\n\t\tBrowserMatch ^Mozilla/4 gzip-only-text/html\n\t\tBrowserMatch ^Mozilla/4\\.0[678] no-gzip\n\t\tBrowserMatch \\bMSIE !no-gzip !gzip-only-text/html\n\t</IfModule>\n# END GZIP_COMPRESSION\n",
+            'SECURITY_WP_CONFIG' => "# BEGIN SECURITY_WP_CONFIG\n\t# Block Access to wp-config.php\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-config\\.php$ - [F,L]\n\t</IfModule>\n# END SECURITY_WP_CONFIG\n",
+            'BLOCK_XMLRPC' => "# BEGIN BLOCK_XMLRPC\n\t# Block XML-RPC\n\t<Files xmlrpc.php>\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</Files>\n# END BLOCK_XMLRPC\n",
+            'SECURITY_NO_INDEX' => "# BEGIN SECURITY_NO_INDEX\nOptions -Indexes\n# END SECURITY_NO_INDEX\n",
+            'SECURITY_HT_FILES' => "# BEGIN SECURITY_HT_FILES\n\t# Block Access to .htaccess and .htpasswd\n\t<FilesMatch \"^\\.(htaccess|htpasswd)$\">\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</FilesMatch>\n# END SECURITY_HT_FILES\n",
+            'REDIRECT_HTTPS' => "# BEGIN REDIRECT_HTTPS\n\t# Force HTTPS\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTPS} !=on\n\t\tRewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_HTTPS\n",
+            'WP_LOGIN_PASSWORD' => "# BEGIN WP_LOGIN_PASSWORD\n\t# Password Protect wp-login.php\n\t<Files wp-login.php>\n\t\tAuthType Basic\n\t\tAuthName \"Restricted Area\"\n\t\tAuthUserFile {{HOME_URL}}/.htpasswd\n\t\tRequire valid-user\n\t</Files>\n# END WP_LOGIN_PASSWORD\n",
+            'CORS_ORIGIN' => "# BEGIN CORS_ORIGIN\n\t# Fix CORS for Fonts and Assets\n\t<IfModule mod_headers.c>\n\t\t<FilesMatch \"\\.(ttf|otf|eot|woff|woff2)$\">\n\t\t\tHeader set Access-Control-Allow-Origin \"*\"\n\t\t</FilesMatch>\n\t</IfModule>\n# END CORS_ORIGIN\n",
+            'PHP_TWEAKS' => "# BEGIN PHP_TWEAKS\n\tphp_value upload_max_filesize 20M\n\tphp_value post_max_size 20M\n\tphp_value memory_limit 256M\n# END PHP_TWEAKS\n",
+            'MOD_SECURITY' => "# BEGIN MOD_SECURITY\n\t# Enable ModSecurity\n\t<IfModule mod_security.c>\n\t\tSecFilterEngine On\n\t\tSecFilterScanPOST On\n\t</IfModule>\n# END MOD_SECURITY\n",
+            'BLOCK_XSS_UA' => "# BEGIN BLOCK_XSS_UA\n\t# Block XSS attacks and malicious User-Agents\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\t# XSS: Query string patterns\n\t\tRewriteCond %{QUERY_STRING} (<|%3C).*?(script|img|onerror|alert)[^>]*>|javascript:|alert\\( [NC,OR]\n\t\t# XSS: POST body patterns\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{THE_REQUEST} (<|%3C).*?(script|img|onerror|alert)[^>]*> [NC,OR]\n\t\t# Malicious User-Agents\n\t\tRewriteCond %{HTTP_USER_AGENT} (libwww-perl|wget|curl|nikto|sqlmap) [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_XSS_UA\n",
+            'HOTLINK_PROTECTION' => "# BEGIN HOTLINK_PROTECTION\n\t# Prevent Hotlinking (bypassed on localhost)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_HOST} !^(localhost|127\\.0\\.0\\.1)$ [NC]\n\t\tRewriteCond %{HTTP_REFERER} !^$\n\t\tRewriteCond %{HTTP_REFERER} !^https?://(www\\.)?{{HOME_URL}}/ [NC]\n\t\tRewriteRule \\.(jpg|jpeg|png|gif|webp|pdf|svg)$ - [F,L]\n\t</IfModule>\n# END HOTLINK_PROTECTION\n",
+            'LIMIT_UPLOAD_SIZE' => "# BEGIN LIMIT_UPLOAD_SIZE\n\tphp_value upload_max_filesize 10M\n\tphp_value post_max_size 10M\n# END LIMIT_UPLOAD_SIZE\n",
+            'DISABLE_PHP_UPLOADS' => "# BEGIN DISABLE_PHP_UPLOADS\n\t# Disable PHP in wp-content/uploads\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/uploads/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_UPLOADS\n",
+            'FORCE_DOWNLOAD' => "# BEGIN FORCE_DOWNLOAD\n\t# Force Downloads for Certain File Types\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule \\.(pdf|zip|rar)$ - [R=302,L]\n\t</IfModule>\n# END FORCE_DOWNLOAD\n",
+            'REDIRECT_WWW' => "# BEGIN REDIRECT_WWW\n\t# Force non-www\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTP_HOST} ^www\\.(.+)$ [NC]\n\t\tRewriteRule ^(.*)$ https://%1/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_WWW\n",
+            'HSTS_HEADER' => "# BEGIN HSTS_HEADER\n\t# Enable HSTS\n\t<IfModule mod_headers.c>\n\t\tHeader set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" env=HTTPS\n\t</IfModule>\n# END HSTS_HEADER\n",
+            'SECURITY_HEADERS' => "# BEGIN SECURITY_HEADERS\n\t# Additional Security Headers\n\t<IfModule mod_headers.c>\n\t\tHeader set X-XSS-Protection \"1; mode=block\"\n\t\tHeader set X-Content-Type-Options \"nosniff\"\n\t\tHeader set X-Permitted-Cross-Domain-Policies \"none\"\n\t\tHeader set X-Frame-Options \"SAMEORIGIN\"\n\t\tHeader set Referrer-Policy \"no-referrer-when-downgrade\"\n\t</IfModule>\n# END SECURITY_HEADERS\n",
+            'DISABLE_USER_ENUM' => "# BEGIN DISABLE_USER_ENUM\n\t# Disable User Enumeration\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteBase /\n\t\tRewriteCond %{QUERY_STRING} ^author=([0-9]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END DISABLE_USER_ENUM\n",
+            'DISABLE_PHP_WPINCLUDES' => "# BEGIN DISABLE_PHP_WPINCLUDES\n\t# Disable PHP in wp-includes\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPINCLUDES\n",
+            'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n\t# Disable PHP in wp-content (except plugins/themes)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPCONTENT\n",
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Block unauthorized POSTs to wp-login.php without a nonce\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
+            'FILE_SCRIPT_PROTECTION' => "# BEGIN FILE_SCRIPT_PROTECTION\n\t# Protect Sensitive Files and Block Hidden Files\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-content/uploads/.*\\.(log|bak|sql|zip)$ - [F]\n\t\tRewriteRule ^\\.(?!well-known).* - [F]\n\t</IfModule>\n# END FILE_SCRIPT_PROTECTION\n",
+            'BLOCK_DIR_TRAVERSAL' => "# BEGIN BLOCK_DIR_TRAVERSAL\n\t# Block Directory Traversal attacks\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (\.\./|\.\.%2f) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)template_path=.*\.\./.*$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)progressfile=.*\.\./.*$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_DIR_TRAVERSAL\n",
+            'BLOCK_SQL_INJECTION' => "# BEGIN BLOCK_SQL_INJECTION\n\t# Block SQL Injection attacks with comprehensive query string patterns\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval|sleep|\-\-|\#) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)id=.*(union|select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)country_id=.*(select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)columns=.*(select|sleep).* [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_SQL_INJECTION\n",
+            'BLOCK_MALICIOUS_UPLOAD' => "# BEGIN BLOCK_MALICIOUS_UPLOAD\n\t# Block malicious file inclusion or upload attempts via query string\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (^|&)file=.*\.(php|phtml|phps)$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_MALICIOUS_UPLOAD\n",
+            'BLOCK_LFI' => "# BEGIN BLOCK_LFI\n\t# Block Local File Inclusion (LFI) attacks\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)file=.*etc/passwd$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_LFI\n",
+        ];
+    
+        $this->block_descriptions = [
+            'ADMIN_IP_RESTRICT' => 'Restricts wp-admin access to specific IP addresses (default: 127.0.0.1 for localhost). Edit IPs in the rule.',
+            'ADMIN_BASIC_AUTH' => 'Adds HTTP Basic Authentication to wp-admin, requiring a username/password from an .htpasswd file. Exempts admin-ajax.php.',
+            'ADMIN_BLOCK_PHP' => 'Blocks PHP files in wp-admin that don’t exist, like random.php, with a 403 error. Lets real admin files, like users.php, work normally.',
+            'ADMIN_NO_INDEX' => 'Prevents directory listing in wp-admin.',
+            'ADMIN_RATE_LIMIT' => 'Basic rate-limiting for wp-admin requests; requires a cookie (rate_limit_exempt=1) to bypass (needs PHP support).',
+            'ADMIN_HTTPS' => 'Forces HTTPS for wp-admin only, redirecting HTTP requests to HTTPS.',
+            'BLOCK_BAD_BOTS' => 'Blocks known bad bots (e.g., scrapers, downloaders) from the entire site by checking their User-Agent, denying access with a 403 error.',
+            'BLOCK_AI_BOTS' => 'Blocks AI scraping bots like CCBot, ChatGPT, GPTBot, and others from the entire site with a 403 error.',
+            'LSCACHE' => 'Optimizes caching for LiteSpeed servers.',
+            'BROWSER_CACHE' => 'Enables browser caching for static assets like images and scripts.',
+            'GZIP_COMPRESSION' => 'Compresses content to speed up page loads.',
+            'SECURITY_WP_CONFIG' => 'Blocks access to wp-config.php.',
+            'BLOCK_XMLRPC' => 'Disables XML-RPC to prevent brute-force attacks.',
+            'SECURITY_NO_INDEX' => 'Prevents directory listing.',
+            'SECURITY_HT_FILES' => 'Blocks access to .htaccess and similar files.',
+            'REDIRECT_HTTPS' => 'Forces all traffic to HTTPS.',
+            'WP_LOGIN_PASSWORD' => 'Adds password protection to wp-login.php (requires .htpasswd).',
+            'CORS_ORIGIN' => 'Fixes CORS issues for fonts and assets.',
+            'PHP_TWEAKS' => 'Adjusts PHP settings for better performance.',
+            'MOD_SECURITY' => 'Enables ModSecurity filters for extra protection.',
+            'BLOCK_XSS_UA' => 'Blocks XSS attacks (query strings and POST bodies) and malicious User-Agents.',
+            'HOTLINK_PROTECTION' => 'Prevents other sites from hotlinking your files (disabled on localhost).',
+            'LIMIT_UPLOAD_SIZE' => 'Caps upload size at 10MB to prevent abuse.',
+            'DISABLE_PHP_UPLOADS' => 'Blocks PHP execution in wp-content/uploads.',
+            'FORCE_DOWNLOAD' => 'Forces downloads for PDFs, ZIPs, and RARs.',
+            'REDIRECT_WWW' => 'Forces non-www URLs (toggleable to www).',
+            'HSTS_HEADER' => 'Enforces HTTPS with HSTS for a year, with preload support.',
+            'SECURITY_HEADERS' => 'Adds security headers to protect against common web vulnerabilities.',
+            'DISABLE_USER_ENUM' => 'Prevents user enumeration via author query strings.',
+            'DISABLE_PHP_WPINCLUDES' => 'Blocks PHP execution in wp-includes directory.',
+            'DISABLE_PHP_WPCONTENT' => 'Blocks PHP execution in wp-content, except in plugins and themes.',
+            'PREVENT_BRUTE_FORCE_WP_LOGIN' => 'Blocks unauthorized POST requests to wp-login.php without a valid nonce, preventing brute force attacks.',
+            'FILE_SCRIPT_PROTECTION' => 'Blocks access to sensitive file types in uploads and hidden files except .well-known.',
+            'BLOCK_DIR_TRAVERSAL' => 'Blocks Directory Traversal attacks by detecting ../ sequences and specific file access attempts (e.g., /etc/passwd).',
+            'BLOCK_SQL_INJECTION' => 'Blocks SQL Injection attacks by detecting malicious patterns and specific parameter exploits in query strings.',
+            'BLOCK_MALICIOUS_UPLOAD' => 'Blocks malicious file inclusion attempts via query string parameters (e.g., file=evil.php).',
+            'BLOCK_LFI' => 'Blocks Local File Inclusion (LFI) attacks by detecting attempts to include sensitive files like /etc/passwd.',
+        ];
+    
+        add_action('admin_menu', [$this, 'add_admin_page']);
+        add_action('admin_init', [$this, 'handle_form_submission']);
+        add_action('admin_enqueue_scripts', [$this, 'load_admin_assets']);
+        add_action('wp_ajax_test_htaccess', [$this, 'ajax_test_htaccess']);
+        add_action('wp_ajax_restore_backup', [$this, 'ajax_restore_backup']);
+        add_action('wp_ajax_backup_htaccess', [$this, 'ajax_backup_htaccess']);
+        add_action('wp_ajax_delete_backup', [$this, 'ajax_delete_backup']);
+        add_action('admin_notices', [$this, 'display_admin_notices']);
+        if (is_admin()) {
+            $this->check_permissions();
+        }
     }
-}
 
     public function validate_login_nonce() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['login_nonce'])) {

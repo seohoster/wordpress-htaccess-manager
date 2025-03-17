@@ -130,17 +130,7 @@ A secure, user-friendly WordPress plugin for managing .htaccess files, created b
 
 ## 🔄 Changelog
 
-### Version 1.9.40
-- Added advanced brute force protection with nonce validation
-- Enhanced rate limiting with cookie-based exemption
-- Improved backup directory security
-- Expanded AI bot blocking rules (CCBot, ChatGPT, Anthropic, etc.)
-- Fixed login form nonce implementation
-- Added sensitive file type protection (.log, .bak, .sql, .zip)
-- Increased PHP memory limit to 256M
-- Added more comprehensive security headers
-- Improved AJAX handling in Basic Authentication
-- Enhanced hotlink protection with localhost bypass
+### See change.log file
 
 ## 🔜 Upcoming Features
 

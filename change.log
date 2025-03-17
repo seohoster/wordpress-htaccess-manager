@@ -1,0 +1,24 @@
+WP_HTAccess_Manager Changelog
+===========================
+
+Version 1.9.42 - March 17, 2025
+- Adjusted curl commands for Windows compatibility with --insecure flag and escaped special characters.
+- Updated test documentation to handle Windows cmd syntax for all block rule tests.
+
+Version 1.9.41 - March 16, 2025
+- Added new block rules for Wordfence attack mitigation: BLOCK_DIR_TRAVERSAL, BLOCK_XSS, BLOCK_SQL_INJECTION, BLOCK_MALICIOUS_UPLOAD, and BLOCK_LFI.
+- Enhanced ANTI_XSS rule to complement new blocks and reduce redundancy.
+
+Version 1.9.40 - March 15, 2025
+- Integrated full bot lists for BLOCK_BAD_BOTS and BLOCK_AI_BOTS with over 100 and 10 entries respectively.
+- Improved plugin documentation with detailed block descriptions for admin interface.
+
+Version 1.9.39 - March 14, 2025
+- Added PREVENT_BRUTE_FORCE_WP_LOGIN block to secure wp-login.php with nonce validation.
+- Introduced FILE_SCRIPT_PROTECTION to block sensitive files and hidden files in uploads.
+
+Version 1.9.38 - March 13, 2025
+- Initial implementation of admin-only and root-only block toggles in the admin page.
+- Added backup and restore functionality with automatic htaccess backups.
+
+===========================

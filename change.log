@@ -1,6 +1,15 @@
 WP_HTAccess_Manager Changelog
 ===========================
 
+Version 1.9.45 - March 20, 2025
+- Removed SQL injection from BLOCK_XSS_SQL_INJ, merged into BLOCK_SQL_INJECTION, and renamed BLOCK_XSS_SQL_INJ to BLOCK_XSS_UA.
+
+Version 1.9.44 - March 19, 2025
+- Merged ANTI_XSS and BLOCK_XSS into a new rule BLOCK_XSS_SQL_INJ for unified XSS and SQL injection protection.
+
+Version 1.9.43 - March 18, 2025
+- Modified HTML/CSS: Set block buttons to 100% width, increased button color intensity by 50%, and split toggles into a 100% width two-column layout.
+
 Version 1.9.42 - March 17, 2025
 - Adjusted curl commands for Windows compatibility with --insecure flag and escaped special characters.
 - Updated test documentation to handle Windows cmd syntax for all block rule tests.

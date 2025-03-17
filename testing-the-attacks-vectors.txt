@@ -1,0 +1,259 @@
+WP_HTAccess_Manager Block Rule Attack Tests
+=========================================
+
+1. ADMIN_IP_RESTRICT
+   Purpose: Restricts wp-admin to specific IPs (default: 127.0.0.1).
+   Test: Access wp-admin from a non-allowed IP.
+     Command: curl --insecure https://localhost/wordpress/wp-admin/ -H "X-Forwarded-For: 192.168.1.100"
+     Expected Outcome: 403 Forbidden
+
+2. ADMIN_BASIC_AUTH
+   Purpose: Password-protects wp-admin (requires .htpasswd).
+   Test 1: Access wp-admin without credentials.
+     Command: curl --insecure https://localhost/wordpress/wp-admin/
+     Expected Outcome: 401 Unauthorized
+   Test 2: Access admin-ajax.php without credentials (exemption).
+     Command: curl --insecure https://localhost/wordpress/wp-admin/admin-ajax.php
+     Expected Outcome: 200 OK
+
+3. ADMIN_BLOCK_PHP
+   Purpose: Blocks non-existent PHP files in wp-admin.
+   Test 1: Request a non-existent PHP file in wp-admin.
+     Command: curl --insecure https://localhost/wordpress/wp-admin/nonexistent.php
+     Expected Outcome: 403 Forbidden
+   Test 2: Request an existing admin PHP file (e.g., admin.php).
+     Command: curl --insecure https://localhost/wordpress/wp-admin/admin.php
+     Expected Outcome: 200 OK (or WordPress redirect)
+
+4. ADMIN_NO_INDEX ???????????????????????????????????????????????????????????????????????????????????????
+   Purpose: Prevents directory listing in wp-admin.
+   Test: Attempt to list directory contents (requires directory listing enabled).
+     Command: curl --insecure https://localhost/wordpress/wp-admin/
+     Expected Outcome: 403 Forbidden (if directory listing is attempted)
+
+5. ADMIN_RATE_LIMIT
+   Purpose: Rate-limits wp-admin requests without a cookie.
+   Test 1: Access wp-admin without the cookie.
+     Command: curl --insecure https://localhost/wordpress/wp-admin/ --cookie ""
+     Expected Outcome: 429 Too Many Requests
+   Test 2: Access with the cookie.
+     Command: curl --insecure https://localhost/wordpress/wp-admin/ --cookie "rate_limit_exempt=1"
+     Expected Outcome: 200 OK (or WordPress redirect)
+
+6. ADMIN_HTTPS
+   Purpose: Forces HTTPS for wp-admin.
+   Test: Access wp-admin over HTTP.
+     Command: curl http://localhost/wordpress/wp-admin/ -I
+     Expected Outcome: 301 Redirect to https://localhost/wordpress/wp-admin/
+
+7. BLOCK_BAD_BOTS
+   Purpose: Blocks known bad bots by User-Agent.
+   Test: Simulate a request from a bad bot (e.g., HTTrack).
+     Command: curl --insecure https://localhost/wordpress/ -A "HTTrack"
+     Expected Outcome: 403 Forbidden
+
+8. BLOCK_AI_BOTS
+   Purpose: Blocks AI scraping bots (e.g., GPTBot).
+   Test: Simulate a request from an AI bot.
+     Command: curl --insecure https://localhost/wordpress/ -A "GPTBot"
+     Expected Outcome: 403 Forbidden
+
+9. SECURITY_WP_CONFIG
+   Purpose: Blocks access to wp-config.php.
+   Test: Attempt to access wp-config.php.
+     Command: curl --insecure https://localhost/wordpress/wp-config.php
+     Expected Outcome: 403 Forbidden
+
+10. BLOCK_XMLRPC
+    Purpose: Blocks access to xmlrpc.php.
+    Test: Attempt to access xmlrpc.php.
+      Command: curl --insecure https://localhost/wordpress/xmlrpc.php
+      Expected Outcome: 403 Forbidden
+
+11. SECURITY_NO_INDEX
+    Purpose: Prevents directory listing site-wide.
+    Test: Attempt to list directory contents (requires directory listing enabled).
+      Command: curl --insecure https://localhost/wordpress/wp-content/uploads/
+      Expected Outcome: 403 Forbidden (if directory listing is attempted)
+
+12. SECURITY_HT_FILES
+    Purpose: Blocks access to .htaccess and .htpasswd.
+    Test 1: Attempt to access .htaccess.
+      Command: curl --insecure https://localhost/wordpress/.htaccess
+      Expected Outcome: 403 Forbidden
+    Test 2: Attempt to access .htpasswd.
+      Command: curl --insecure https://localhost/wordpress/.htpasswd
+      Expected Outcome: 403 Forbidden
+
+13. REDIRECT_HTTPS
+    Purpose: Forces HTTPS site-wide.
+    Test: Access the site over HTTP.
+      Command: curl http://localhost/wordpress/ -I
+      Expected Outcome: 301 Redirect to https://localhost/wordpress/
+
+14. WP_LOGIN_PASSWORD
+    Purpose: Password-protects wp-login.php (requires .htpasswd).
+    Test: Access wp-login.php without credentials.
+      Command: curl --insecure https://localhost/wordpress/wp-login.php
+      Expected Outcome: 401 Unauthorized
+
+15. MOD_SECURITY
+    Purpose: Enables ModSecurity (requires server support).
+    Test: Send a malicious payload.
+      Command: curl --insecure https://localhost/wordpress/?param=<script>alert(1)</script>
+      Expected Outcome: 403 Forbidden (if ModSecurity rules are configured)
+
+16. ANTI_XSS
+    Purpose: Blocks XSS and SQL injection patterns in query strings.
+    Test 1 (XSS): Send an XSS payload.
+      Command: curl --insecure "https://localhost/wordpress/?param=<script>alert(1)</script>"
+      Expected Outcome: 403 Forbidden
+    Test 2 (SQL Injection): Send a SQL injection payload.
+      Command: curl --insecure "https://localhost/wordpress/?param=union+select+1,2,3"
+      Expected Outcome: 403 Forbidden
+    Test 3 (Malicious User-Agent): Use a known attack tool User-Agent.
+      Command: curl --insecure https://localhost/wordpress/ -A "sqlmap"
+      Expected Outcome: 403 Forbidden
+
+17. HOTLINK_PROTECTION
+    Purpose: Prevents hotlinking of files (bypassed on localhost).
+    Test: Simulate a hotlink request (requires non-localhost setup).
+      Command: curl --insecure https://example.com/image.jpg -e "http://malicious-site.com"
+      Expected Outcome: 403 Forbidden (on a live server)
+
+18. LIMIT_UPLOAD_SIZE
+    Purpose: Caps upload size (PHP setting).
+    Test: Attempt to upload a file larger than 10MB (requires form setup).
+      Note: Test via PHP upload form.
+      Expected Outcome: PHP error (e.g., "exceeds upload_max_filesize")
+
+19. DISABLE_PHP_UPLOADS
+    Purpose: Blocks PHP execution in wp-content/uploads.
+    Test: Upload and access a PHP file in uploads.
+      Command: curl --insecure https://localhost/wordpress/wp-content/uploads/test.php
+      Expected Outcome: 403 Forbidden
+
+20. FORCE_DOWNLOAD
+    Purpose: Forces downloads for PDFs, ZIPs, and RARs.
+    Test: Access a PDF file.
+      Command: curl --insecure https://localhost/wordpress/sample.pdf -I
+      Expected Outcome: 302 Redirect (forces download)
+
+21. REDIRECT_WWW
+    Purpose: Forces non-www URLs.
+    Test: Access the site with www.
+      Command: curl --insecure https://www.localhost/wordpress/ -I
+      Expected Outcome: 301 Redirect to https://localhost/wordpress/
+
+22. HSTS_HEADER
+    Purpose: Enforces HSTS (adds Strict-Transport-Security header).
+    Test: Check for HSTS header.
+      Command: curl --insecure https://localhost/wordpress/ -I
+      Expected Outcome: Header includes Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+23. SECURITY_HEADERS
+    Purpose: Adds security headers (e.g., X-XSS-Protection).
+    Test: Check for security headers.
+      Command: curl --insecure https://localhost/wordpress/ -I
+      Expected Outcome: Headers include X-XSS-Protection: 1; mode=block, X-Content-Type-Options: nosniff, etc.
+
+24. DISABLE_USER_ENUM
+    Purpose: Prevents user enumeration via author query.
+    Test: Attempt user enumeration.
+      Command: curl --insecure "https://localhost/wordpress/?author=1"
+      Expected Outcome: 403 Forbidden
+
+25. DISABLE_PHP_WPINCLUDES
+    Purpose: Blocks PHP execution in wp-includes.
+    Test: Access a PHP file in wp-includes.
+      Command: curl --insecure https://localhost/wordpress/wp-includes/test.php
+      Expected Outcome: 403 Forbidden
+
+26. DISABLE_PHP_WPCONTENT
+    Purpose: Blocks PHP execution in wp-content (except plugins/themes).
+    Test 1: Access a PHP file in wp-content/uploads.
+      Command: curl --insecure https://localhost/wordpress/wp-content/uploads/test.php
+      Expected Outcome: 403 Forbidden
+    Test 2: Access a PHP file in wp-content/plugins.
+      Command: curl --insecure https://localhost/wordpress/wp-content/plugins/some-plugin/test.php
+      Expected Outcome: 200 OK (or WordPress redirect)
+
+27. PREVENT_BRUTE_FORCE_WP_LOGIN
+    Purpose: Blocks unauthorized POSTs to wp-login.php without a nonce.
+    Test 1: POST to wp-login.php without a nonce.
+      Command: curl --insecure -X POST https://localhost/wordpress/wp-login.php -d "log=test&pwd=test"
+      Expected Outcome: 403 Forbidden
+    Test 2: POST with a valid nonce.
+      Command: curl --insecure -X POST "https://localhost/wordpress/wp-login.php?login_nonce=$(curl --insecure https://localhost/wordpress/wp-login.php | findstr login_nonce | for /f "tokens=2 delims==" %i in ('echo %i') do @echo %i)" -d "log=test&pwd=test"
+      Expected Outcome: 200 OK (or WordPress redirect)
+      Note: Windows `findstr` replaces `grep`; adjust the nonce extraction if needed.
+
+28. FILE_SCRIPT_PROTECTION
+    Purpose: Blocks sensitive file types in uploads and hidden files.
+    Test 1 (Sensitive File): Access a .log file in uploads.
+      Command: curl --insecure https://localhost/wordpress/wp-content/uploads/test.log
+      Expected Outcome: 403 Forbidden
+    Test 2 (Hidden File): Access a hidden file.
+      Command: curl --insecure https://localhost/wordpress/.testfile
+      Expected Outcome: 403 Forbidden
+    Test 3 (Allowed Hidden File): Access .well-known.
+      Command: curl --insecure https://localhost/wordpress/.well-known/test
+      Expected Outcome: 200 OK (or 404 if file doesn’t exist)
+
+29. BLOCK_DIR_TRAVERSAL
+    Purpose: Blocks Directory Traversal attacks (../ and /etc/passwd).
+    Test 1 (../): Use ../ in query string.
+      Command: curl --insecure "https://localhost/wordpress/?path=../etc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 2 (template_path): Use template_path with traversal.
+      Command: curl --insecure "https://localhost/wordpress/?template_path=../../../etc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 3 (progressfile): Use progressfile with traversal.
+      Command: curl --insecure "https://localhost/wordpress/?progressfile=../../../../etc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 4 (logfile): Use logfile to access /etc/passwd.
+      Command: curl --insecure "https://localhost/wordpress/?logfile=/etc/passwd"
+      Expected Outcome: 403 Forbidden
+
+30. BLOCK_XSS
+    Purpose: Blocks XSS attacks in query strings and POST bodies.
+    Test 1 (Query String): Use an XSS payload in query string.
+      Command: curl --insecure "https://localhost/wordpress/?param=<script>alert(1)</script>"
+      Expected Outcome: 403 Forbidden
+    Test 2 (POST Body): Use an XSS payload in POST body.
+      Command: curl --insecure -X POST https://localhost/wordpress/ -d "endpoint=<img src=x onerror=alert(document.domain)>"
+      Expected Outcome: 403 Forbidden
+
+31. BLOCK_SQL_INJECTION
+    Purpose: Blocks SQL injection patterns in query strings.
+    Test 1 (UNION): Use a UNION-based SQL injection.
+      Command: curl --insecure "https://localhost/wordpress/?id=-5219 UNION ALL SELECT NULL,NULL,NULL,md5(999999999),NULL--"
+      Expected Outcome: 403 Forbidden
+    Test 2 (SLEEP): Use a time-based SQL injection.
+      Command: curl --insecure "https://localhost/wordpress/?country_id=1 AND (SELECT 42 FROM (SELECT(SLEEP(6)))b)"
+      Expected Outcome: 403 Forbidden
+    Test 3 (columns): Use a columns-based SQL injection.
+      Command: curl --insecure "https://localhost/wordpress/?columns=name AND (SELECT 1 FROM (SELECT(SLEEP(7)))aaaa)-- -"
+      Expected Outcome: 403 Forbidden
+
+32. BLOCK_MALICIOUS_UPLOAD
+    Purpose: Blocks PHP file uploads via query string.
+    Test: Attempt to upload a PHP file.
+      Command: curl --insecure "https://localhost/wordpress/?file=malicious.php"
+      Expected Outcome: 403 Forbidden
+
+33. BLOCK_LFI
+    Purpose: Blocks Local File Inclusion (LFI) attempts to /etc/passwd.
+    Test 1 (logfile): Use logfile to access /etc/passwd.
+      Command: curl --insecure "https://localhost/wordpress/?logfile=/etc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 2 (file): Use file to access /etc/passwd.
+      Command: curl --insecure "https://localhost/wordpress/?file=/etc/passwd"
+      Expected Outcome: 403 Forbidden
+
+=========================================
+Notes:
+- Ensure each block is toggled on in the plugin admin interface.
+- Use --insecure with curl to bypass SSL verification on localhost (Windows).
+- Enable Apache RewriteLog for debugging (e.g., RewriteLog "C:/xampp/apache/logs/rewrite.log" RewriteLogLevel 3).
+- Test legitimate requests after each attack to avoid false positives (e.g., curl --insecure https://localhost/wordpress/).

@@ -102,7 +102,7 @@ class WP_HTAccess_Manager {
             'BLOCK_DIR_TRAVERSAL' => "# BEGIN BLOCK_DIR_TRAVERSAL\n\t# Block Directory Traversal attacks\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (\.\./|\.\.%2f) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)template_path=.*\.\./.*$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)progressfile=.*\.\./.*$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_DIR_TRAVERSAL\n",
             'BLOCK_SQL_INJECTION' => "# BEGIN BLOCK_SQL_INJECTION\n\t# Block SQL Injection attacks with comprehensive query string patterns\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval|sleep|\-\-|\#) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)id=.*(union|select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)country_id=.*(select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)columns=.*(select|sleep).* [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_SQL_INJECTION\n",
             'BLOCK_MALICIOUS_UPLOAD' => "# BEGIN BLOCK_MALICIOUS_UPLOAD\n\t# Block malicious file inclusion or upload attempts via query string\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (^|&)file=.*\.(php|phtml|phps)$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_MALICIOUS_UPLOAD\n",
-            'BLOCK_LFI' => "# BEGIN BLOCK_LFI\n\t# Block Local File Inclusion (LFI) attacks\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)file=.*etc/passwd$ [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_LFI\n",
+            'BLOCK_LFI' => "# BEGIN BLOCK_LFI\n\t# Block Local File Inclusion (LFI) attacks with broader parameter and traversal detection\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\t# Check for common LFI parameters with traversal or sensitive file access\n\t\tRewriteCond %{QUERY_STRING} (^|&)(page|include|path|view|load|file|logfile)=.*(etc/passwd|etc/shadow|var/www/.*\.php|var/log/apache/.*log|proc/self/environ|\.\./|\.\.%2f|%00) [NC,OR]\n\t\t# Additional check for POST-based LFI (limited by .htaccess)\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{THE_REQUEST} (^|&)page=.*(etc/passwd|etc/shadow|var/www/.*\.php|var/log/apache/.*log|proc/self/environ|\.\./|\.\.%2f|%00) [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_LFI\n"
         ];
     
         $this->block_descriptions = [
@@ -370,7 +370,7 @@ class WP_HTAccess_Manager {
                 <input type="hidden" name="htaccess_file" value="<?php echo esc_attr($current_file); ?>">
                 <h2>Editing: <?php echo $current_file === 'root' ? 'Root' : 'wp-admin'; ?> .htaccess</h2>
                 <textarea name="htaccess_content" id="htaccess-editor" rows="15" cols="80"><?php echo esc_textarea($content); ?></textarea>
-                <div style="display: flex; flex-wrap: wrap; width: 100%; display:block;">
+                <div style="display: flex; flex-wrap: wrap; width: 100%;">
                     <div style="flex: 1; width: 100%;">
                         <h2>Predefined Blocks (hover button for description)</h2>
                         <div id="predefined-blocks" style="width: 100%;">
@@ -476,69 +476,19 @@ class WP_HTAccess_Manager {
             .admin-only.hidden, .root-only.hidden { display: none; }
             /* Remove admin-only background and border */
             .admin-only { background-color: transparent; border: none; }
-            .block-button { margin: 5px; padding: 5px 10px; background-color: #999999; border: 1px solid #666; border-radius: 3px; cursor: pointer; } /* Darker gray: #999999 */
-            .block-button:hover { background-color: #666666; } /* Darker hover gray: #666666 */
-            .block-button.block-added { background-color: #6b9a6b; } /* Darker green: #6b9a6b */
-            .block-button.block-not-added { background-color: #999999; } /* Match default gray */
+            .block-button { margin: 5px; padding: 5px 10px; background-color: #999999; border: 1px solid #666; border-radius: 3px; cursor: pointer; }
+            .block-button:hover { background-color: #666666; }
+            .block-button.block-added { background-color: #6b9a6b; }
+            .block-button.block-not-added { background-color: #999999; }
             #toggle-blocks .toggle-item { margin: 15px 0; overflow: hidden; clear: both; }
-            .toggle-title {
-                float: left;
-                font-weight: bold;
-                margin-right: 10px;
-                line-height: 20px;
-            }
-            .toggle-switch {
-                position: relative;
-                display: inline-block;
-                width: 40px;
-                height: 20px;
-                float: right;
-                vertical-align: middle;
-            }
-            .toggle-switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-            .toggle-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: #ccc;
-                -webkit-transition: .4s;
-                transition: .4s;
-                border-radius: 20px;
-            }
-            .toggle-slider:before {
-                position: absolute;
-                content: "";
-                height: 16px;
-                width: 16px;
-                left: 2px;
-                bottom: 2px;
-                background-color: white;
-                -webkit-transition: .4s;
-                transition: .4s;
-                border-radius: 50%;
-            }
-            input:checked + .toggle-slider {
-                background-color: #2196F3;
-            }
-            input:checked + .toggle-slider:before {
-                -webkit-transform: translateX(20px);
-                -ms-transform: translateX(20px);
-                transform: translateX(20px);
-            }
-            .toggle-description { 
-                clear: both;
-                margin-left: 0;
-                font-size: 12px; 
-                color: #666; 
-                padding-top: 5px;
-            }
+            .toggle-title { float: left; font-weight: bold; margin-right: 10px; line-height: 20px; }
+            .toggle-switch { position: relative; display: inline-block; width: 40px; height: 20px; float: right; vertical-align: middle; }
+            .toggle-switch input { opacity: 0; width: 0; height: 0; }
+            .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; -webkit-transition: .4s; transition: .4s; border-radius: 20px; }
+            .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; -webkit-transition: .4s; transition: .4s; border-radius: 50%; }
+            input:checked + .toggle-slider { background-color: #2196F3; }
+            input:checked + .toggle-slider:before { -webkit-transform: translateX(20px); -ms-transform: translateX(20px); transform: translateX(20px); }
+            .toggle-description { clear: both; margin-left: 0; font-size: 12px; color: #666; padding-top: 5px; }
             .wrap { max-width: 1200px; }
             #predefined-blocks { padding: 10px; width: 100%; }
             #toggle-blocks { padding: 10px; }
@@ -666,6 +616,7 @@ class WP_HTAccess_Manager {
     
                 // Add All Rules button handler
                 $('#add-all-rules').on('click', function() {
+                    var currentFile = '<?php echo esc_js($current_file); ?>'; // Get current file context
                     var currentContent = editor.getValue().trim();
                     var wpBlock = '';
                     var newContent = '# Note: WP_LOGIN_PASSWORD is excluded by default. Use it only for extreme password protection needs (requires .htpasswd setup).\n';
@@ -695,7 +646,10 @@ class WP_HTAccess_Manager {
                                 }
                             }
     
-                            newContent += blockContent + '\n';
+                            // Add block only if it's not an admin rule when editing root
+                            if (!(currentFile === 'root' && blockKey.indexOf('ADMIN_') === 0)) {
+                                newContent += blockContent + '\n';
+                            }
                         }
                     }
     

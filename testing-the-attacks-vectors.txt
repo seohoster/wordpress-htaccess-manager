@@ -127,11 +127,26 @@ WP_HTAccess_Manager Block Rule Attack Tests
       Command: curl --insecure "https://localhost/wordpress/?columns=name AND (SELECT 1 FROM (SELECT(SLEEP(7)))aaaa)-- -"
       Expected Outcome: 403 Forbidden
 
-18. LIMIT_UPLOAD_SIZE
-    Purpose: Caps upload size (PHP setting).
-    Test: Attempt to upload a file larger than 10MB (requires form setup).
-      Note: Test via PHP upload form.
-      Expected Outcome: PHP error (e.g., "exceeds upload_max_filesize")
+18. BLOCK_LFI
+    Purpose: Blocks LFI attacks by detecting directory traversal and access to sensitive files across multiple query parameters.
+    Test 1 (Traversal with page): Use ../ with page parameter.
+      Command: curl --insecure "https://localhost/wordpress/?page=../../etc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 2 (Traversal with path): Use traversal with path parameter.
+      Command: curl --insecure "https://localhost/wordpress/?path=../var/log/apache/access.log"
+      Expected Outcome: 403 Forbidden
+    Test 3 (Encoded Traversal): Use URL-encoded traversal.
+      Command: curl --insecure "https://localhost/wordpress/?include=%2e%2e%2f%2e%2e%2fetc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 4 (Proc Self Environ): Target environment variables.
+      Command: curl --insecure "https://localhost/wordpress/?view=/proc/self/environ"
+      Expected Outcome: 403 Forbidden
+    Test 5 (POST with Traversal): Send traversal in POST body.
+      Command: curl --insecure -X POST "https://localhost/wordpress/" -d "page=../../etc/passwd"
+      Expected Outcome: 403 Forbidden
+    Test 6 (Legitimate Query): Test a safe parameter.
+      Command: curl --insecure "https://localhost/wordpress/?page=about"
+      Expected Outcome: 200 OK (or normal response)
 
 19. DISABLE_PHP_UPLOADS
     Purpose: Blocks PHP execution in wp-content/uploads.

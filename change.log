@@ -1,6 +1,12 @@
 WP_HTAccess_Manager Changelog
 ===========================
 
+Version 1.9.47 - March 18, 2025
+- Enhanced BLOCK_LFI rule to detect a wider range of parameters (page, include, path, view, load, file, logfile), traversal patterns (../, ..%2f, %00), and sensitive files (etc/passwd, logs, proc/self/environ).
+
+Version 1.9.46 - March 21, 2025
+- Fixed Add All Rules button to exclude admin-only rules (ADMIN_ prefixed) when editing root .htaccess.
+
 Version 1.9.45 - March 20, 2025
 - Removed SQL injection from BLOCK_XSS_SQL_INJ, merged into BLOCK_SQL_INJECTION, and renamed BLOCK_XSS_SQL_INJ to BLOCK_XSS_UA.
 

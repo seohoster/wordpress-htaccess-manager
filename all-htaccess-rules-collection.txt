@@ -1,4 +1,32 @@
 # Note: WP_LOGIN_PASSWORD is excluded by default. Use it only for extreme password protection needs (requires .htpasswd setup).
+## BEGIN WP_LOGIN_PASSWORD
+#	# Password Protect wp-login.php
+#	<Files wp-login.php>
+#		AuthType Basic
+#		AuthName "Restricted Area"
+#		AuthUserFile http://localhost/wordpress/.htpasswd
+#		Require valid-user
+#	</Files>
+## END WP_LOGIN_PASSWORD
+
+# BEGIN BLOCK_BAD_BOTS
+	# Block known bad bots site-wide
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTP_USER_AGENT} (abot|aipbot|asterias|EI|libwww-perl|LWP|lwp|MSIECrawler|nameprotect|PlantyNet_WebRobot|UCmore|Alligator|AllSubmitter|Anonymous|Asterias|autoemailspider|Badass|Baiduspider|BecomeBot|Bitacle|bladder\ fusion|Blogshares\ Spiders|Board\ Bot|Convera|ConveraMultiMediaCrawler|c-spider|DA|DnloadMage|Download\ Demon|Download\ Express|Download\ Wonder|dragonfly|DreamPassport|DSurf|DTS\ Agent|EBrowse|eCatch|edgeio|Email\ Extractor|EmailSiphon|EmailWolf|EmeraldShield|ESurf|Exabot|ExtractorPro|FileHeap!\ file\ downloader|FileHound|Forex|Franklin\ Locator|FreshDownload|FrontPage|FSurf|Gaisbot|Gamespy_Arcade|genieBot|GetBot|GetRight|Gigabot|Go!Zilla|Go-Ahead-Got-It|GOFORITBOT|heritrix|HLoader|HooWWWer|HTTrack|iCCrawler|ichiro|iGetter|imds_monitor|Industry\ Program|Indy\ Library|InetURL|InstallShield\ DigitalWizard|IRLbot|IUPUI\ Research\ Bot|Java|jeteye|jeteyebot|JoBo|JOC\ Web\ Spider|Kapere|Larbin|LeechGet|LightningDownload|Linkie|Mac\ Finder|Mail\ Sweeper|Mass\ Downloader|MetaProducts\ Download\ Express|Microsoft\ Data\ Access|Microsoft\ URL\ Control|Missauga\ Locate|Missauga\ Locator|Missigua\ Locator|Missouri\ College\ Browse|Mister\ PiX|MovableType|Mozi!|Mozilla\/3\.0\ \(compatible\)|Mozilla\/5\.0\ \(compatible;\ MSIE\ 5\.0\)|MSIE_6\.0|MSIECrawler|MVAClient|MyFamilyBot|MyGetRight|NASA\ Search|Naver|NaverBot|NetAnts|NetResearchServer|NEWT\ ActiveX|Nextopia|NICErsPRO|NimbleCrawler|Nitro\ Downloader|Nutch|Offline\ Explorer|OmniExplorer|OutfoxBot|P3P|PagmIEDownload|pavuk|PHP\ version|playstarmusic|Program\ Shareware|Progressive\ Download|psycheclone|puf|PussyCat|PuxaRapido|Python-urllib|RealDownload|RedKernel|relevantnoise|RepoMonkey\ Bait\ &\ Tackle|RTG30|SBIder|script|Seekbot|SiteSnagger|SmartDownload|sna-|Snap\ bot|SpeedDownload|Sphere|sproose|SQ\ Webscanner|Stamina|Star\ Downloader|Teleport|TurnitinBot|UdmSearch|URLGetFile|User-Agent|UtilMind\ HTTPGet|WebAuto|WebCapture|webcollage|WebCopier|WebFilter|WebReaper|Website\ eXtractor|WebStripper|WebZIP|Wells\ Search|WEP\ Search\ 00|Wget|Wildsoft\ Surfer|WinHttpRequest|WWWOFFLE|Xaldon\ WebSpider|Y!TunnelPro|YahooYSMcm|Zade|ZBot|zerxbot) [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END BLOCK_BAD_BOTS
+
+# BEGIN BLOCK_AI_BOTS
+	# Block AI Scraping Bots
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTP_USER_AGENT} (CCBot|ChatGPT|GPTBot|anthropic-ai|Omgilibot|Omgili|FacebookBot|Diffbot|Bytespider|ImagesiftBot|cohere-ai|ClaudeBot) [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
+# END BLOCK_AI_BOTS
+
 # BEGIN LSCACHE
 	# LiteSpeed Cache Optimization
 	<IfModule LiteSpeed>
@@ -61,12 +89,12 @@ Options -Indexes
 # END SECURITY_HT_FILES
 
 # BEGIN REDIRECT_HTTPS
-#	# Force HTTPS
-#	<IfModule mod_rewrite.c>
-#		RewriteEngine On
-#		RewriteCond %{HTTPS} !=on
-#		RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
-#	</IfModule>
+	# Force HTTPS
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{HTTPS} !=on
+		RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+	</IfModule>
 # END REDIRECT_HTTPS
 
 # BEGIN CORS_ORIGIN
@@ -92,19 +120,20 @@ Options -Indexes
 	</IfModule>
 # END MOD_SECURITY
 
-# BEGIN ANTI_XSS
-	# Anti-XSS and SQL Injection Protection
+# BEGIN BLOCK_XSS_UA
+	# Block XSS attacks and malicious User-Agents
 	<IfModule mod_rewrite.c>
 		RewriteEngine On
-		RewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC,OR]
-		RewriteCond %{QUERY_STRING} GLOBALS= [NC,OR]
-		RewriteCond %{QUERY_STRING} _REQUEST= [NC,OR]
-		RewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval\() [NC,OR]
-		RewriteCond %{QUERY_STRING} (javascript:|alert\() [NC,OR]
+		# XSS: Query string patterns
+		RewriteCond %{QUERY_STRING} (<|%3C).*?(script|img|onerror|alert)[^>]*>|javascript:|alert\( [NC,OR]
+		# XSS: POST body patterns
+		RewriteCond %{REQUEST_METHOD} POST
+		RewriteCond %{THE_REQUEST} (<|%3C).*?(script|img|onerror|alert)[^>]*> [NC,OR]
+		# Malicious User-Agents
 		RewriteCond %{HTTP_USER_AGENT} (libwww-perl|wget|curl|nikto|sqlmap) [NC]
-		RewriteRule .* - [F,L]
+		RewriteRule ^ - [F,L]
 	</IfModule>
-# END ANTI_XSS
+# END BLOCK_XSS_UA
 
 # BEGIN HOTLINK_PROTECTION
 	# Prevent Hotlinking (bypassed on localhost)
@@ -112,10 +141,11 @@ Options -Indexes
 		RewriteEngine On
 		RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)$ [NC]
 		RewriteCond %{HTTP_REFERER} !^$
-		RewriteCond %{HTTP_REFERER} !^https?://(www\.)?localhost/iwpmanager/ [NC]
+		RewriteCond %{HTTP_REFERER} !^https?://(www\.)?http://localhost/wordpress/ [NC]
 		RewriteRule \.(jpg|jpeg|png|gif|webp|pdf|svg)$ - [F,L]
 	</IfModule>
 # END HOTLINK_PROTECTION
+
 # BEGIN LIMIT_UPLOAD_SIZE
 	php_value upload_max_filesize 10M
 	php_value post_max_size 10M
@@ -191,13 +221,13 @@ Options -Indexes
 # END DISABLE_PHP_WPCONTENT
 
 # BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN
-    # Prevent Brute Force on wp-login.php with Nonce
-    <IfModule mod_rewrite.c>
-        RewriteCond %{REQUEST_METHOD} POST
-        RewriteCond %{REQUEST_URI} ^(.*)?wp-login\.php(.*)$
-        RewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]
-        RewriteRule .* - [F,L]
-    </IfModule>
+	# Block unauthorized POSTs to wp-login.php without a nonce
+	<IfModule mod_rewrite.c>
+		RewriteCond %{REQUEST_METHOD} POST
+		RewriteCond %{REQUEST_URI} ^(.*)?wp-login\.php(.*)$
+		RewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]
+		RewriteRule .* - [F,L]
+	</IfModule>
 # END PREVENT_BRUTE_FORCE_WP_LOGIN
 
 # BEGIN FILE_SCRIPT_PROTECTION
@@ -208,40 +238,11 @@ Options -Indexes
 	</IfModule>
 # END FILE_SCRIPT_PROTECTION
 
-# BEGIN BLOCK_AI_BOTS
-	# Block AI Scraping Bots
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteCond %{HTTP_USER_AGENT} (CCBot|ChatGPT|GPTBot|anthropic-ai|Omgilibot|Omgili|FacebookBot|Diffbot|Bytespider|ImagesiftBot|cohere-ai|ClaudeBot) [NC]
-		RewriteRule .* - [F,L]
-	</IfModule>
-# END BLOCK_AI_BOTS
-
-# BEGIN BLOCK_BAD_BOTS
-	# Block known bad bots site-wide
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteCond %{HTTP_USER_AGENT} (abot|aipbot|asterias|EI|libwww-perl|LWP|lwp|MSIECrawler|nameprotect|PlantyNet_WebRobot|UCmore|Alligator|AllSubmitter|Anonymous|Asterias|autoemailspider|Badass|Baiduspider|BecomeBot|Bitacle|bladder\ fusion|Blogshares\ Spiders|Board\ Bot|Convera|ConveraMultiMediaCrawler|c-spider|DA|DnloadMage|Download\ Demon|Download\ Express|Download\ Wonder|dragonfly|DreamPassport|DSurf|DTS\ Agent|EBrowse|eCatch|edgeio|Email\ Extractor|EmailSiphon|EmailWolf|EmeraldShield|ESurf|Exabot|ExtractorPro|FileHeap!\ file\ downloader|FileHound|Forex|Franklin\ Locator|FreshDownload|FrontPage|FSurf|Gaisbot|Gamespy_Arcade|genieBot|GetBot|GetRight|Gigabot|Go!Zilla|Go-Ahead-Got-It|GOFORITBOT|heritrix|HLoader|HooWWWer|HTTrack|iCCrawler|ichiro|iGetter|imds_monitor|Industry\ Program|Indy\ Library|InetURL|InstallShield\ DigitalWizard|IRLbot|IUPUI\ Research\ Bot|Java|jeteye|jeteyebot|JoBo|JOC\ Web\ Spider|Kapere|Larbin|LeechGet|LightningDownload|Linkie|Mac\ Finder|Mail\ Sweeper|Mass\ Downloader|MetaProducts\ Download\ Express|Microsoft\ Data\ Access|Microsoft\ URL\ Control|Missauga\ Locate|Missauga\ Locator|Missigua\ Locator|Missouri\ College\ Browse|Mister\ PiX|MovableType|Mozi!|Mozilla\/3\.0\ \(compatible\)|Mozilla\/5\.0\ \(compatible;\ MSIE\ 5\.0\)|MSIE_6\.0|MSIECrawler|MVAClient|MyFamilyBot|MyGetRight|NASA\ Search|Naver|NaverBot|NetAnts|NetResearchServer|NEWT\ ActiveX|Nextopia|NICErsPRO|NimbleCrawler|Nitro\ Downloader|Nutch|Offline\ Explorer|OmniExplorer|OutfoxBot|P3P|PagmIEDownload|pavuk|PHP\ version|playstarmusic|Program\ Shareware|Progressive\ Download|psycheclone|puf|PussyCat|PuxaRapido|Python-urllib|RealDownload|RedKernel|relevantnoise|RepoMonkey\ Bait\ &\ Tackle|RTG30|SBIder|script|Seekbot|SiteSnagger|SmartDownload|sna-|Snap\ bot|SpeedDownload|Sphere|sproose|SQ\ Webscanner|Stamina|Star\ Downloader|Teleport|TurnitinBot|UdmSearch|URLGetFile|User-Agent|UtilMind\ HTTPGet|WebAuto|WebCapture|webcollage|WebCopier|WebFilter|WebReaper|Website\ eXtractor|WebStripper|WebZIP|Wells\ Search|WEP\ Search\ 00|Wget|Wildsoft\ Surfer|WinHttpRequest|WWWOFFLE|Xaldon\ WebSpider|Y!TunnelPro|YahooYSMcm|Zade|ZBot|zerxbot) [NC]
-		RewriteRule .* - [F,L]
-	</IfModule>
-# END BLOCK_BAD_BOTS
-
-# BEGIN BLOCK_XSS
-	# Block Cross-Site Scripting (XSS) attacks
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteCond %{QUERY_STRING} (<script|onerror=|alert\() [NC,OR]
-		RewriteCond %{REQUEST_METHOD} POST
-		RewriteCond %{THE_REQUEST} (<|%3C).*?(script|img|onerror|alert)[^>]*> [NC]
-		RewriteRule ^ - [F,L]
-	</IfModule>
-# END BLOCK_XSS
-
 # BEGIN BLOCK_SQL_INJECTION
-	# Block SQL Injection attacks
+	# Block SQL Injection attacks with comprehensive query string patterns
 	<IfModule mod_rewrite.c>
 		RewriteEngine On
-		RewriteCond %{QUERY_STRING} (union|select|sleep|md5|\-\-|\#) [NC,OR]
+		RewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval|sleep|\-\-|\#) [NC,OR]
 		RewriteCond %{QUERY_STRING} (^|&)id=.*(union|select|sleep).* [NC,OR]
 		RewriteCond %{QUERY_STRING} (^|&)country_id=.*(select|sleep).* [NC,OR]
 		RewriteCond %{QUERY_STRING} (^|&)columns=.*(select|sleep).* [NC]
@@ -249,37 +250,28 @@ Options -Indexes
 	</IfModule>
 # END BLOCK_SQL_INJECTION
 
-# BEGIN BLOCK_MALICIOUS_UPLOAD
-	# Block malicious file uploads
+# BEGIN BLOCK_FILE_TRAVERSAL_INCLUSION
+	# Block Directory Traversal and Local File Inclusion (LFI) attacks by detecting traversal patterns and sensitive file access
 	<IfModule mod_rewrite.c>
 		RewriteEngine On
-		RewriteCond %{REQUEST_URI} ^.*\.php$ [NC]
-		RewriteCond %{QUERY_STRING} (^|&)file=.*\.php$ [NC]
+		# Detect traversal patterns and sensitive file access in query strings
+		RewriteCond %{QUERY_STRING} ((\.\/|\.\%2f|%2e%2e%2f|%00|\.\%5c|%5c\.\%5c)+|.*(etc/passwd|etc/shadow|etc/hosts|etc/issue|etc/group|etc/apache2/.*\.conf|var/log/apache/.*log|var/log/nginx/.*log|proc/self/environ|/wp-config\.php|/wp-content/uploads/.*\.php)) [NC,OR]
+		# Detect traversal or sensitive files in POST requests (limited to THE_REQUEST)
+		RewriteCond %{REQUEST_METHOD} POST
+		RewriteCond %{THE_REQUEST} ((\.\/|\.\%2f|%2e%2e%2f|%00|\.\%5c|%5c\.\%5c)+|.*(etc/passwd|etc/shadow|etc/hosts|etc/issue|etc/group|etc/apache2/.*\.conf|var/log/apache/.*log|var/log/nginx/.*log|proc/self/environ|/wp-config\.php|/wp-content/uploads/.*\.php)) [NC]
+		RewriteRule ^ - [F,L]
+	</IfModule>
+# END BLOCK_FILE_TRAVERSAL_INCLUSION
+
+# BEGIN BLOCK_MALICIOUS_UPLOAD
+	# Block malicious file inclusion or upload attempts via query string, targeting executable extensions
+	<IfModule mod_rewrite.c>
+		RewriteEngine On
+		RewriteCond %{QUERY_STRING} .*\.(php|phtml|phps|asp|aspx|cgi|pl|py)$ [NC,OR]
+		RewriteCond %{QUERY_STRING} ((\.\/|\.\%2f|%2e%2e%2f)+) [NC]
 		RewriteRule ^ - [F,L]
 	</IfModule>
 # END BLOCK_MALICIOUS_UPLOAD
-
-# BEGIN BLOCK_LFI
-	# Block Local File Inclusion (LFI) attacks
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)file=.*etc/passwd$ [NC]
-		RewriteRule ^ - [F,L]
-	</IfModule>
-# END BLOCK_LFI
-
-# BEGIN BLOCK_DIR_TRAVERSAL
-	# Block Directory Traversal attacks
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteCond %{QUERY_STRING} (\.\./|\.\.%2f) [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)template_path=.*\.\./.*$ [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)progressfile=.*\.\./.*$ [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)logfile=.*etc/passwd$ [NC]
-		RewriteRule ^ - [F,L]
-	</IfModule>
-# END BLOCK_DIR_TRAVERSAL
 
 # BEGIN WordPress
 # The directives (lines) between "BEGIN WordPress" and "END WordPress" are
@@ -288,14 +280,13 @@ Options -Indexes
 	<IfModule mod_rewrite.c>
 		RewriteEngine On
 		RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-		RewriteBase /iwpmanager/
+		RewriteBase /wordpress/
 		RewriteRule ^index\.php$ - [L]
 		RewriteCond %{REQUEST_FILENAME} !-f
 		RewriteCond %{REQUEST_FILENAME} !-d
-		RewriteRule . /iwpmanager/index.php [L]
+		RewriteRule . /wordpress/index.php [L]
 	</IfModule>
 # END WordPress
-
 
 #######################################################################
 ### WP-ADMIN RULES #####################################

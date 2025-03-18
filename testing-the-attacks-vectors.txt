@@ -127,32 +127,44 @@ WP_HTAccess_Manager Block Rule Attack Tests
       Command: curl --insecure "https://localhost/wordpress/?columns=name AND (SELECT 1 FROM (SELECT(SLEEP(7)))aaaa)-- -"
       Expected Outcome: 403 Forbidden
 
-18. BLOCK_LFI
-    Purpose: Blocks LFI attacks by detecting directory traversal and access to sensitive files across multiple query parameters.
-    Test 1 (Traversal with page): Use ../ with page parameter.
-      Command: curl --insecure "https://localhost/wordpress/?page=../../etc/passwd"
+18. BLOCK_FILE_TRAVERSAL_INCLUSION
+Purpose: Blocks Directory Traversal and LFI attacks by detecting traversal patterns and access to sensitive files across all query parameters.
+    Test 1 (Traversal with any param): Use ../ with a generic parameter.
+      Command: curl --insecure "https://localhost/wordpress/?data=../etc/passwd"
       Expected Outcome: 403 Forbidden
-    Test 2 (Traversal with path): Use traversal with path parameter.
-      Command: curl --insecure "https://localhost/wordpress/?path=../var/log/apache/access.log"
+    Test 2 (Encoded Traversal): Use URL-encoded traversal.
+      Command: curl --insecure "https://localhost/wordpress/?lang=%2e%2e%2f%2e%2e%2fetc/shadow"
       Expected Outcome: 403 Forbidden
-    Test 3 (Encoded Traversal): Use URL-encoded traversal.
-      Command: curl --insecure "https://localhost/wordpress/?include=%2e%2e%2f%2e%2e%2fetc/passwd"
+    Test 3 (Sensitive Log): Target Apache log.
+      Command: curl --insecure "https://localhost/wordpress/?view=/var/log/apache/access.log"
       Expected Outcome: 403 Forbidden
-    Test 4 (Proc Self Environ): Target environment variables.
-      Command: curl --insecure "https://localhost/wordpress/?view=/proc/self/environ"
+    Test 4 (WordPress Config): Target wp-config.php.
+      Command: curl --insecure "https://localhost/wordpress/?include=/wp-config.php"
       Expected Outcome: 403 Forbidden
     Test 5 (POST with Traversal): Send traversal in POST body.
-      Command: curl --insecure -X POST "https://localhost/wordpress/" -d "page=../../etc/passwd"
+      Command: curl --insecure -X POST "https://localhost/wordpress/" -d "param=../proc/self/environ"
       Expected Outcome: 403 Forbidden
     Test 6 (Legitimate Query): Test a safe parameter.
       Command: curl --insecure "https://localhost/wordpress/?page=about"
       Expected Outcome: 200 OK (or normal response)
 
-19. DISABLE_PHP_UPLOADS
-    Purpose: Blocks PHP execution in wp-content/uploads.
-    Test: Upload and access a PHP file in uploads.
-      Command: curl --insecure https://localhost/wordpress/wp-content/uploads/test.php
-      Expected Outcome: 403 Forbidden
+19. BLOCK_MALICIOUS_UPLOAD
+Purpose: Blocks malicious file inclusion or upload attempts via query strings by detecting executable extensions and directory traversal patterns.
+Test 1 (Generic Parameter with PHP): Use a different parameter with PHP.
+  Command: curl --insecure "https://localhost/wordpress/?upload=malicious.php"
+  Expected Outcome: 403 Forbidden
+Test 2 (ASP Extension): Use an ASP file.
+  Command: curl --insecure "https://localhost/wordpress/?data=attack.asp"
+  Expected Outcome: 403 Forbidden
+Test 3 (Traversal with Parameter): Use traversal with any parameter.
+  Command: curl --insecure "https://localhost/wordpress/?path=../evil.php"
+  Expected Outcome: 403 Forbidden
+Test 4 (Encoded Traversal): Use URL-encoded traversal.
+  Command: curl --insecure "https://localhost/wordpress/?include=%2e%2e%2fscript.php"
+  Expected Outcome: 403 Forbidden
+Test 5 (Legitimate Query): Test a safe parameter.
+  Command: curl --insecure "https://localhost/wordpress/?id=123"
+  Expected Outcome: 200 OK (or normal response)
 
 20. FORCE_DOWNLOAD
     Purpose: Forces downloads for PDFs, ZIPs, and RARs.

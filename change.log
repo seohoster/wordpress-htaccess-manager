@@ -1,6 +1,14 @@
 WP_HTAccess_Manager Changelog
 ===========================
 
+
+
+Version 1.9.49 - March 18, 2025
+- Enhanced BLOCK_MALICIOUS_UPLOAD to detect executable extensions (php, asp, cgi, etc.) and traversal patterns in any query parameter, removing the file= restriction.
+
+Version 1.9.48 - March 18, 2025
+- Merged BLOCK_LFI and BLOCK_DIR_TRAVERSAL into a new rule BLOCK_FILE_TRAVERSAL_INCLUSION, enhanced with broader traversal patterns (../, %2e%2e%2f, %00) and sensitive file detection (etc/passwd, logs, wp-config.php, etc.).
+
 Version 1.9.47 - March 18, 2025
 - Enhanced BLOCK_LFI rule to detect a wider range of parameters (page, include, path, view, load, file, logfile), traversal patterns (../, ..%2f, %00), and sensitive files (etc/passwd, logs, proc/self/environ).
 

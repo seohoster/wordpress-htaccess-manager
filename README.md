@@ -130,7 +130,7 @@ A secure, user-friendly WordPress plugin for managing .htaccess files, created b
 
 ## 🔄 Changelog
 
-### See change.log file
+For detailed version history and changes, please check the change.log file.
 
 ## 🔜 Upcoming Features
 

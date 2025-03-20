@@ -9,6 +9,10 @@
 #	</Files>
 ## END WP_LOGIN_PASSWORD
 
+# BEGIN REDIRECT_DOTS
+	RedirectMatch 404 /\..*$
+# END REDIRECT_DOTS
+
 # BEGIN BLOCK_BAD_BOTS
 	# Block known bad bots site-wide
 	<IfModule mod_rewrite.c>
@@ -100,7 +104,7 @@ Options -Indexes
 # BEGIN CORS_ORIGIN
 	# Fix CORS for Fonts and Assets
 	<IfModule mod_headers.c>
-		<FilesMatch "\.(ttf|otf|eot|woff|woff2)$">
+		<FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2)$">
 			Header set Access-Control-Allow-Origin "*"
 		</FilesMatch>
 	</IfModule>
@@ -141,7 +145,7 @@ Options -Indexes
 		RewriteEngine On
 		RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)$ [NC]
 		RewriteCond %{HTTP_REFERER} !^$
-		RewriteCond %{HTTP_REFERER} !^https?://(www\.)?http://localhost/wordpress/ [NC]
+		RewriteCond %{HTTP_REFERER} !^https?://(www\.)?https://localhost/iwpmanager/ [NC]
 		RewriteRule \.(jpg|jpeg|png|gif|webp|pdf|svg)$ - [F,L]
 	</IfModule>
 # END HOTLINK_PROTECTION
@@ -230,38 +234,14 @@ Options -Indexes
 	</IfModule>
 # END PREVENT_BRUTE_FORCE_WP_LOGIN
 
-# BEGIN FILE_SCRIPT_PROTECTION
-	# Protect Sensitive Files and Block Hidden Files
-	<IfModule mod_rewrite.c>
-		RewriteRule ^wp-content/uploads/.*\.(log|bak|sql|zip)$ - [F]
-		RewriteRule ^\.(?!well-known).* - [F]
-	</IfModule>
-# END FILE_SCRIPT_PROTECTION
-
-# BEGIN BLOCK_SQL_INJECTION
-	# Block SQL Injection attacks with comprehensive query string patterns
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval|sleep|\-\-|\#) [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)id=.*(union|select|sleep).* [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)country_id=.*(select|sleep).* [NC,OR]
-		RewriteCond %{QUERY_STRING} (^|&)columns=.*(select|sleep).* [NC]
-		RewriteRule ^ - [F,L]
-	</IfModule>
-# END BLOCK_SQL_INJECTION
-
-# BEGIN BLOCK_FILE_TRAVERSAL_INCLUSION
-	# Block Directory Traversal and Local File Inclusion (LFI) attacks by detecting traversal patterns and sensitive file access
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		# Detect traversal patterns and sensitive file access in query strings
-		RewriteCond %{QUERY_STRING} ((\.\/|\.\%2f|%2e%2e%2f|%00|\.\%5c|%5c\.\%5c)+|.*(etc/passwd|etc/shadow|etc/hosts|etc/issue|etc/group|etc/apache2/.*\.conf|var/log/apache/.*log|var/log/nginx/.*log|proc/self/environ|/wp-config\.php|/wp-content/uploads/.*\.php)) [NC,OR]
-		# Detect traversal or sensitive files in POST requests (limited to THE_REQUEST)
-		RewriteCond %{REQUEST_METHOD} POST
-		RewriteCond %{THE_REQUEST} ((\.\/|\.\%2f|%2e%2e%2f|%00|\.\%5c|%5c\.\%5c)+|.*(etc/passwd|etc/shadow|etc/hosts|etc/issue|etc/group|etc/apache2/.*\.conf|var/log/apache/.*log|var/log/nginx/.*log|proc/self/environ|/wp-config\.php|/wp-content/uploads/.*\.php)) [NC]
-		RewriteRule ^ - [F,L]
-	</IfModule>
-# END BLOCK_FILE_TRAVERSAL_INCLUSION
+# BEGIN PROTECT_SENSITIVE_FILES
+# Protect sensitive files and block hidden files across the site
+<FilesMatch "(\.((bak|config|dist|fla|inc|ini|log|psd|sh|sql|swp|zip)|~)|^(?!\.well-known)\..*$)">
+    Order allow,deny
+    Deny from all
+    Satisfy All
+</FilesMatch>
+# END PROTECT_SENSITIVE_FILES
 
 # BEGIN BLOCK_MALICIOUS_UPLOAD
 	# Block malicious file inclusion or upload attempts via query string, targeting executable extensions
@@ -273,20 +253,15 @@ Options -Indexes
 	</IfModule>
 # END BLOCK_MALICIOUS_UPLOAD
 
-# BEGIN WordPress
-# The directives (lines) between "BEGIN WordPress" and "END WordPress" are
-# dynamically generated, and should only be modified via WordPress filters.
-# Any changes to the directives between these markers will be overwritten.
-	<IfModule mod_rewrite.c>
-		RewriteEngine On
-		RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-		RewriteBase /wordpress/
-		RewriteRule ^index\.php$ - [L]
-		RewriteCond %{REQUEST_FILENAME} !-f
-		RewriteCond %{REQUEST_FILENAME} !-d
-		RewriteRule . /wordpress/index.php [L]
-	</IfModule>
-# END WordPress
+# BEGIN BLOCK_IFRAME
+# Block iframe embedding to prevent clickjacking, with exceptions for specific paths
+<IfModule mod_headers.c>
+    # Allow framing for specific paths (add more paths as needed)
+    SetEnvIf Request_URI "^/example-page$" allow_framing=true
+    # Set X-Frame-Options to SAMEORIGIN by default, unless allow_framing is true
+    Header set X-Frame-Options SAMEORIGIN env=!allow_framing
+</IfModule>
+# END BLOCK_IFRAME
 
 #######################################################################
 ### WP-ADMIN RULES #####################################

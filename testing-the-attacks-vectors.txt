@@ -149,28 +149,40 @@ Purpose: Blocks Directory Traversal and LFI attacks by detecting traversal patte
       Expected Outcome: 200 OK (or normal response)
 
 19. BLOCK_MALICIOUS_UPLOAD
-Purpose: Blocks malicious file inclusion or upload attempts via query strings by detecting executable extensions and directory traversal patterns.
-Test 1 (Generic Parameter with PHP): Use a different parameter with PHP.
-  Command: curl --insecure "https://localhost/wordpress/?upload=malicious.php"
-  Expected Outcome: 403 Forbidden
-Test 2 (ASP Extension): Use an ASP file.
-  Command: curl --insecure "https://localhost/wordpress/?data=attack.asp"
-  Expected Outcome: 403 Forbidden
-Test 3 (Traversal with Parameter): Use traversal with any parameter.
-  Command: curl --insecure "https://localhost/wordpress/?path=../evil.php"
-  Expected Outcome: 403 Forbidden
-Test 4 (Encoded Traversal): Use URL-encoded traversal.
-  Command: curl --insecure "https://localhost/wordpress/?include=%2e%2e%2fscript.php"
-  Expected Outcome: 403 Forbidden
-Test 5 (Legitimate Query): Test a safe parameter.
-  Command: curl --insecure "https://localhost/wordpress/?id=123"
-  Expected Outcome: 200 OK (or normal response)
+    Purpose: Blocks malicious file inclusion or upload attempts via query strings by detecting executable extensions and directory traversal patterns.
+    Test 1 (Generic Parameter with PHP): Use a different parameter with PHP.
+      Command: curl --insecure "https://localhost/wordpress/?upload=malicious.php"
+      Expected Outcome: 403 Forbidden
+    Test 2 (ASP Extension): Use an ASP file.
+      Command: curl --insecure "https://localhost/wordpress/?data=attack.asp"
+      Expected Outcome: 403 Forbidden
+    Test 3 (Traversal with Parameter): Use traversal with any parameter.
+      Command: curl --insecure "https://localhost/wordpress/?path=../evil.php"
+      Expected Outcome: 403 Forbidden
+    Test 4 (Encoded Traversal): Use URL-encoded traversal.
+      Command: curl --insecure "https://localhost/wordpress/?include=%2e%2e%2fscript.php"
+      Expected Outcome: 403 Forbidden
+    Test 5 (Legitimate Query): Test a safe parameter.
+      Command: curl --insecure "https://localhost/wordpress/?id=123"
+      Expected Outcome: 200 OK (or normal response)
 
-20. FORCE_DOWNLOAD
-    Purpose: Forces downloads for PDFs, ZIPs, and RARs.
-    Test: Access a PDF file.
-      Command: curl --insecure https://localhost/wordpress/sample.pdf -I
-      Expected Outcome: 302 Redirect (forces download)
+20. PROTECT_SENSITIVE_FILES
+    Purpose: Protects sensitive files (e.g., .bak, .log, .sql) and hidden files (except .well-known) across the site by denying access.
+    Test 1 (Sensitive File in Root): Attempt to access a .bak file in the root.
+      Command: curl --insecure "https://localhost/backup.bak"
+      Expected Outcome: 403 Forbidden
+    Test 2 (Sensitive File in Uploads): Attempt to access a .sql file in uploads.
+      Command: curl --insecure "https://localhost/wp-content/uploads/db.sql"
+      Expected Outcome: 403 Forbidden
+    Test 3 (Hidden File): Attempt to access a hidden file.
+      Command: curl --insecure "https://localhost/.gitignore"
+      Expected Outcome: 403 Forbidden
+    Test 4 (Well-Known Exception): Access a file in .well-known.
+      Command: curl --insecure "https://localhost/.well-known/security.txt"
+      Expected Outcome: 200 OK (or normal response, if the file exists)
+    Test 5 (Legitimate File): Access a non-sensitive file.
+      Command: curl --insecure "https://localhost/index.php"
+      Expected Outcome: 200 OK (or normal response)
 
 21. REDIRECT_WWW
     Purpose: Forces non-www URLs.
@@ -184,11 +196,20 @@ Test 5 (Legitimate Query): Test a safe parameter.
       Command: curl --insecure https://localhost/wordpress/ -I
       Expected Outcome: Header includes Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 
-23. SECURITY_HEADERS
-    Purpose: Adds security headers (e.g., X-XSS-Protection).
-    Test: Check for security headers.
-      Command: curl --insecure https://localhost/wordpress/ -I
-      Expected Outcome: Headers include X-XSS-Protection: 1; mode=block, X-Content-Type-Options: nosniff, etc.
+23. BLOCK_IFRAME
+    Purpose: Blocks iframe embedding to prevent clickjacking, with exceptions for specific paths.
+    Test 1 (Iframe on Different Domain): Attempt to embed a protected page in an iframe on a different domain.
+      Manual Test: Create an HTML file on a different domain (or simulate using a local server) with <iframe src="https://localhost/"></iframe>.
+      Expected Outcome: Browser blocks the iframe (X-Frame-Options SAMEORIGIN prevents embedding).
+    Test 2 (Iframe on Same Domain): Embed a protected page in an iframe on the same domain.
+      Manual Test: Create an HTML file on localhost with <iframe src="https://localhost/"></iframe>.
+      Expected Outcome: Iframe loads successfully (SAMEORIGIN allows same-domain embedding).
+    Test 3 (Exception Path): Embed the exception path in an iframe on a different domain.
+      Manual Test: Create an HTML file on a different domain with <iframe src="https://localhost/example-page"></iframe>.
+      Expected Outcome: Iframe loads successfully (allow_framing=true for /example-page).
+    Test 4 (Non-Exception Path): Embed a non-exception path in an iframe on a different domain.
+      Manual Test: Create an HTML file on a different domain with <iframe src="https://localhost/other-page"></iframe>.
+      Expected Outcome: Browser blocks the iframe (X-Frame-Options SAMEORIGIN applies).
 
 24. DISABLE_USER_ENUM
     Purpose: Prevents user enumeration via author query.

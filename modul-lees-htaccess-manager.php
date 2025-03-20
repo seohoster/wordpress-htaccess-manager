@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Lee's .htaccess Manager by Lee @ Magazinon.ro
  * Description: A lightweight plugin by Lee @ Magazinon.ro to manage root and wp-admin .htaccess files with predefined blocks.
- * Version: 1.9.42  
+ * Version: 1.9.56  
  * Author: Lee @ <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>
  * License: GPL2
  *
@@ -83,7 +83,7 @@ class WP_HTAccess_Manager {
             'SECURITY_HT_FILES' => "# BEGIN SECURITY_HT_FILES\n\t# Block Access to .htaccess and .htpasswd\n\t<FilesMatch \"^\\.(htaccess|htpasswd)$\">\n\t\tOrder Deny,Allow\n\t\tDeny from all\n\t</FilesMatch>\n# END SECURITY_HT_FILES\n",
             'REDIRECT_HTTPS' => "# BEGIN REDIRECT_HTTPS\n\t# Force HTTPS\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{HTTPS} !=on\n\t\tRewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]\n\t</IfModule>\n# END REDIRECT_HTTPS\n",
             'WP_LOGIN_PASSWORD' => "# BEGIN WP_LOGIN_PASSWORD\n\t# Password Protect wp-login.php\n\t<Files wp-login.php>\n\t\tAuthType Basic\n\t\tAuthName \"Restricted Area\"\n\t\tAuthUserFile {{HOME_URL}}/.htpasswd\n\t\tRequire valid-user\n\t</Files>\n# END WP_LOGIN_PASSWORD\n",
-            'CORS_ORIGIN' => "# BEGIN CORS_ORIGIN\n\t# Fix CORS for Fonts and Assets\n\t<IfModule mod_headers.c>\n\t\t<FilesMatch \"\\.(ttf|otf|eot|woff|woff2)$\">\n\t\t\tHeader set Access-Control-Allow-Origin \"*\"\n\t\t</FilesMatch>\n\t</IfModule>\n# END CORS_ORIGIN\n",
+            'CORS_ORIGIN' => "# BEGIN CORS_ORIGIN\n\t# Fix CORS for Fonts and Assets\n\t<IfModule mod_headers.c>\n\t\t<FilesMatch \"\\.(ttf|ttc|otf|eot|woff|woff2)$\">\n\t\t\tHeader set Access-Control-Allow-Origin \"*\"\n\t\t</FilesMatch>\n\t</IfModule>\n# END CORS_ORIGIN\n",
             'PHP_TWEAKS' => "# BEGIN PHP_TWEAKS\n\tphp_value upload_max_filesize 20M\n\tphp_value post_max_size 20M\n\tphp_value memory_limit 256M\n# END PHP_TWEAKS\n",
             'MOD_SECURITY' => "# BEGIN MOD_SECURITY\n\t# Enable ModSecurity\n\t<IfModule mod_security.c>\n\t\tSecFilterEngine On\n\t\tSecFilterScanPOST On\n\t</IfModule>\n# END MOD_SECURITY\n",
             'BLOCK_XSS_UA' => "# BEGIN BLOCK_XSS_UA\n\t# Block XSS attacks and malicious User-Agents\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\t# XSS: Query string patterns\n\t\tRewriteCond %{QUERY_STRING} (<|%3C).*?(script|img|onerror|alert)[^>]*>|javascript:|alert\\( [NC,OR]\n\t\t# XSS: POST body patterns\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{THE_REQUEST} (<|%3C).*?(script|img|onerror|alert)[^>]*> [NC,OR]\n\t\t# Malicious User-Agents\n\t\tRewriteCond %{HTTP_USER_AGENT} (libwww-perl|wget|curl|nikto|sqlmap) [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_XSS_UA\n",
@@ -98,16 +98,16 @@ class WP_HTAccess_Manager {
             'DISABLE_PHP_WPINCLUDES' => "# BEGIN DISABLE_PHP_WPINCLUDES\n\t# Disable PHP in wp-includes\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-includes/.*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPINCLUDES\n",
             'DISABLE_PHP_WPCONTENT' => "# BEGIN DISABLE_PHP_WPCONTENT\n\t# Disable PHP in wp-content (except plugins/themes)\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteRule ^wp-content/(?!plugins/|themes/).*\\.php$ - [F,L]\n\t</IfModule>\n# END DISABLE_PHP_WPCONTENT\n",
             'PREVENT_BRUTE_FORCE_WP_LOGIN' => "# BEGIN PREVENT_BRUTE_FORCE_WP_LOGIN\n\t# Block unauthorized POSTs to wp-login.php without a nonce\n\t<IfModule mod_rewrite.c>\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{REQUEST_URI} ^(.*)?wp-login\\.php(.*)$\n\t\tRewriteCond %{QUERY_STRING} !login_nonce=([^&]+) [NC]\n\t\tRewriteRule .* - [F,L]\n\t</IfModule>\n# END PREVENT_BRUTE_FORCE_WP_LOGIN\n",
-            'FILE_SCRIPT_PROTECTION' => "# BEGIN FILE_SCRIPT_PROTECTION\n\t# Protect Sensitive Files and Block Hidden Files\n\t<IfModule mod_rewrite.c>\n\t\tRewriteRule ^wp-content/uploads/.*\\.(log|bak|sql|zip)$ - [F]\n\t\tRewriteRule ^\\.(?!well-known).* - [F]\n\t</IfModule>\n# END FILE_SCRIPT_PROTECTION\n",
-            'BLOCK_SQL_INJECTION' => "# BEGIN BLOCK_SQL_INJECTION\n\t# Block SQL Injection attacks with comprehensive query string patterns\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} (union|select|insert|drop|update|md5|benchmark|alter|delete|truncate|where|base64_decode|eval|sleep|\-\-|\#) [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)id=.*(union|select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)country_id=.*(select|sleep).* [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} (^|&)columns=.*(select|sleep).* [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_SQL_INJECTION\n",
-            'BLOCK_FILE_TRAVERSAL_INCLUSION' => "# BEGIN BLOCK_FILE_TRAVERSAL_INCLUSION\n\t# Block Directory Traversal and Local File Inclusion (LFI) attacks by detecting traversal patterns and sensitive file access\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\t# Detect traversal patterns and sensitive file access in query strings\n\t\tRewriteCond %{QUERY_STRING} ((\\.\\/|\\.\\%2f|%2e%2e%2f|%00|\\.\\%5c|%5c\\.\\%5c)+|.*(etc/passwd|etc/shadow|etc/hosts|etc/issue|etc/group|etc/apache2/.*\\.conf|var/log/apache/.*log|var/log/nginx/.*log|proc/self/environ|/wp-config\\.php|/wp-content/uploads/.*\\.php)) [NC,OR]\n\t\t# Detect traversal or sensitive files in POST requests (limited to THE_REQUEST)\n\t\tRewriteCond %{REQUEST_METHOD} POST\n\t\tRewriteCond %{THE_REQUEST} ((\\.\\/|\\.\\%2f|%2e%2e%2f|%00|\\.\\%5c|%5c\\.\\%5c)+|.*(etc/passwd|etc/shadow|etc/hosts|etc/issue|etc/group|etc/apache2/.*\\.conf|var/log/apache/.*log|var/log/nginx/.*log|proc/self/environ|/wp-config\\.php|/wp-content/uploads/.*\\.php)) [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_FILE_TRAVERSAL_INCLUSION\n",
+            'REDIRECT_DOTS' => "# BEGIN REDIRECT_DOTS\n\tRedirectMatch 404 /\\..*$\n# END REDIRECT_DOTS\n",
+            'BLOCK_IFRAME' => "# BEGIN BLOCK_IFRAME\n# Block iframe embedding to prevent clickjacking, with exceptions for specific paths\n<IfModule mod_headers.c>\n    # Allow framing for specific paths (add more paths as needed)\n    SetEnvIf Request_URI \"^/example-page\$\" allow_framing=true\n    # Set X-Frame-Options to SAMEORIGIN by default, unless allow_framing is true\n    Header set X-Frame-Options SAMEORIGIN env=!allow_framing\n</IfModule>\n# END BLOCK_IFRAME\n",
+            'PROTECT_SENSITIVE_FILES' => "# BEGIN PROTECT_SENSITIVE_FILES\n\t<FilesMatch \"(\\.((bak|config|dist|fla|inc|ini|log|psd|sh|sql|swp|zip)|~)|^(?!\.well-known)\..*\$)\">\n\t    Order allow,deny\n\t    Deny from all\n\t    Satisfy All\n\t</FilesMatch>\n# END PROTECT_SENSITIVE_FILES\n",
             'BLOCK_MALICIOUS_UPLOAD' => "# BEGIN BLOCK_MALICIOUS_UPLOAD\n\t# Block malicious file inclusion or upload attempts via query string, targeting executable extensions\n\t<IfModule mod_rewrite.c>\n\t\tRewriteEngine On\n\t\tRewriteCond %{QUERY_STRING} .*\.(php|phtml|phps|asp|aspx|cgi|pl|py)$ [NC,OR]\n\t\tRewriteCond %{QUERY_STRING} ((\\.\\/|\\.\\%2f|%2e%2e%2f)+) [NC]\n\t\tRewriteRule ^ - [F,L]\n\t</IfModule>\n# END BLOCK_MALICIOUS_UPLOAD\n"
         ];
     
         $this->block_descriptions = [
             'ADMIN_IP_RESTRICT' => 'Restricts wp-admin access to specific IP addresses (default: 127.0.0.1 for localhost). Edit IPs in the rule.',
             'ADMIN_BASIC_AUTH' => 'Adds HTTP Basic Authentication to wp-admin, requiring a username/password from an .htpasswd file. Exempts admin-ajax.php.',
-            'ADMIN_BLOCK_PHP' => 'Blocks PHP files in wp-admin that don’t exist, like random.php, with a 403 error. Lets real admin files, like users.php, work normally.',
+            'ADMIN_BLOCK_PHP' => 'Blocks PHP files in wp-admin that don`t exist, like random.php, with a 403 error. Lets real admin files, like users.php, work normally.',
             'ADMIN_NO_INDEX' => 'Prevents directory listing in wp-admin.',
             'ADMIN_RATE_LIMIT' => 'Basic rate-limiting for wp-admin requests; requires a cookie (rate_limit_exempt=1) to bypass (needs PHP support).',
             'ADMIN_HTTPS' => 'Forces HTTPS for wp-admin only, redirecting HTTP requests to HTTPS.',
@@ -137,8 +137,10 @@ class WP_HTAccess_Manager {
             'DISABLE_PHP_WPINCLUDES' => 'Blocks PHP execution in wp-includes directory.',
             'DISABLE_PHP_WPCONTENT' => 'Blocks PHP execution in wp-content, except in plugins and themes.',
             'PREVENT_BRUTE_FORCE_WP_LOGIN' => 'Blocks unauthorized POST requests to wp-login.php without a valid nonce, preventing brute force attacks.',
-            'FILE_SCRIPT_PROTECTION' => 'Blocks access to sensitive file types in uploads and hidden files except .well-known.',
+            'PROTECT_SENSITIVE_FILES' => 'Protects sensitive files (e.g. .bak .config .dist .fla .inc .ini .log .psd .sh .sql .swp .zip) and hidden files (except .well-known) across the site by denying access.',
             'BLOCK_SQL_INJECTION' => 'Blocks SQL Injection attacks by detecting malicious patterns and specific parameter exploits in query strings.',
+            'REDIRECT_DOTS' => 'Redirect all attempts for a .something file to be a 404 not found, confusing attackers.FUN!',
+            'BLOCK_IFRAME' => 'Blocks iframe embedding to prevent clickjacking by setting X-Frame-Options to SAMEORIGIN, with exceptions for specific paths (e.g., /example-page).  ',
             'BLOCK_FILE_TRAVERSAL_INCLUSION' => 'Blocks Directory Traversal and Local File Inclusion (LFI) attacks by detecting traversal patterns and sensitive file access.',
             'BLOCK_MALICIOUS_UPLOAD' => 'Blocks malicious file inclusion or upload attempts via query strings by detecting executable extensions (e.g., .php, .asp) and directory traversal patterns, regardless of parameter name.'
         ];
@@ -368,8 +370,8 @@ class WP_HTAccess_Manager {
                 <input type="hidden" name="htaccess_file" value="<?php echo esc_attr($current_file); ?>">
                 <h2>Editing: <?php echo $current_file === 'root' ? 'Root' : 'wp-admin'; ?> .htaccess</h2>
                 <textarea name="htaccess_content" id="htaccess-editor" rows="15" cols="80"><?php echo esc_textarea($content); ?></textarea>
-                <div style="display: flex; flex-wrap: wrap; width: 100%;">
-                    <div style="flex: 1; width: 100%;">
+                <div style="width: 100%;">
+                    <div style="width: 100%;">
                         <h2>Predefined Blocks (hover button for description)</h2>
                         <div id="predefined-blocks" style="width: 100%;">
                             <?php foreach ($this->blocks as $key => $block) : ?>
@@ -389,56 +391,32 @@ class WP_HTAccess_Manager {
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    <div style="flex: 1; width: 100%; padding-left: 20px;">
+                    <div style="width: 100%;">
                         <h2>Security Optimizations (Toggle On/Off)</h2>
                         <?php if ($current_file === 'admin') : ?>
                             <p style="font-size: 12px; color: #666;"><em>Note: Root-level rules (e.g., BLOCK_BAD_BOTS) are applied site-wide from the root .htaccess and are hidden here to avoid redundancy.</em></p>
                         <?php endif; ?>
-                        <div id="toggle-blocks" style="display: flex; width: 100%;">
-                            <div style="flex: 1; padding-right: 10px;">
-                                <?php foreach (array_slice($this->blocks, 0, ceil(count($this->blocks) / 2), true) as $key => $block) : ?>
-                                    <?php
-                                    $toggle_class = '';
-                                    if (strpos($key, 'ADMIN_') === 0 && $current_file !== 'admin') {
-                                        $toggle_class = 'admin-only hidden';
-                                    } elseif (strpos($key, 'ADMIN_') === 0) {
-                                        $toggle_class = 'admin-only';
-                                    } elseif ($current_file === 'admin') {
-                                        $toggle_class = 'root-only hidden';
-                                    }
-                                    ?>
-                                    <div class="toggle-item <?php echo $toggle_class; ?>">
-                                        <span class="toggle-title"><?php echo esc_html($key); ?></span>
-                                        <label class="toggle-switch" style="float: right;">
-                                            <input type="checkbox" name="toggle_block[<?php echo esc_attr($key); ?>]" <?php checked($toggle_states[$key]); ?>>
-                                            <span class="toggle-slider"></span>
-                                        </label>
-                                        <p class="toggle-description"><?php echo esc_html($this->block_descriptions[$key]); ?></p>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <div style="flex: 1; padding-left: 10px;">
-                                <?php foreach (array_slice($this->blocks, ceil(count($this->blocks) / 2), null, true) as $key => $block) : ?>
-                                    <?php
-                                    $toggle_class = '';
-                                    if (strpos($key, 'ADMIN_') === 0 && $current_file !== 'admin') {
-                                        $toggle_class = 'admin-only hidden';
-                                    } elseif (strpos($key, 'ADMIN_') === 0) {
-                                        $toggle_class = 'admin-only';
-                                    } elseif ($current_file === 'admin') {
-                                        $toggle_class = 'root-only hidden';
-                                    }
-                                    ?>
-                                    <div class="toggle-item <?php echo $toggle_class; ?>">
-                                        <span class="toggle-title"><?php echo esc_html($key); ?></span>
-                                        <label class="toggle-switch" style="float: right;">
-                                            <input type="checkbox" name="toggle_block[<?php echo esc_attr($key); ?>]" <?php checked($toggle_states[$key]); ?>>
-                                            <span class="toggle-slider"></span>
-                                        </label>
-                                        <p class="toggle-description"><?php echo esc_html($this->block_descriptions[$key]); ?></p>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
+                        <div id="toggle-blocks" style="width: 100%; column-count: 2; column-gap: 20px; break-inside: avoid;">
+                            <?php foreach ($this->blocks as $key => $block) : ?>
+                                <?php
+                                $toggle_class = '';
+                                if (strpos($key, 'ADMIN_') === 0 && $current_file !== 'admin') {
+                                    $toggle_class = 'admin-only hidden';
+                                } elseif (strpos($key, 'ADMIN_') === 0) {
+                                    $toggle_class = 'admin-only';
+                                } elseif ($current_file === 'admin') {
+                                    $toggle_class = 'root-only hidden';
+                                }
+                                ?>
+                                <div class="toggle-item <?php echo $toggle_class; ?>" style="break-inside: avoid; margin-bottom: 15px;">
+                                    <span class="toggle-title"><?php echo esc_html($key); ?></span>
+                                    <label class="toggle-switch" style="float: right;">
+                                        <input type="checkbox" name="toggle_block[<?php echo esc_attr($key); ?>]" <?php checked($toggle_states[$key]); ?>>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <p class="toggle-description"><?php echo esc_html($this->block_descriptions[$key]); ?></p>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
@@ -478,18 +456,78 @@ class WP_HTAccess_Manager {
             .block-button:hover { background-color: #666666; }
             .block-button.block-added { background-color: #6b9a6b; }
             .block-button.block-not-added { background-color: #999999; }
-            #toggle-blocks .toggle-item { margin: 15px 0; overflow: hidden; clear: both; }
-            .toggle-title { float: left; font-weight: bold; margin-right: 10px; line-height: 20px; }
-            .toggle-switch { position: relative; display: inline-block; width: 40px; height: 20px; float: right; vertical-align: middle; }
-            .toggle-switch input { opacity: 0; width: 0; height: 0; }
-            .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; -webkit-transition: .4s; transition: .4s; border-radius: 20px; }
-            .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; -webkit-transition: .4s; transition: .4s; border-radius: 50%; }
-            input:checked + .toggle-slider { background-color: #2196F3; }
-            input:checked + .toggle-slider:before { -webkit-transform: translateX(20px); -ms-transform: translateX(20px); transform: translateX(20px); }
-            .toggle-description { clear: both; margin-left: 0; font-size: 12px; color: #666; padding-top: 5px; }
+            #toggle-blocks {
+                padding: 10px;
+                column-count: 2;
+                column-gap: 20px;
+                break-inside: avoid; /* Prevents items from breaking across columns */
+            }
+            .toggle-item {
+                overflow: hidden;
+                clear: both;
+                break-inside: avoid; /* Ensures each toggle item stays intact */
+                margin-bottom: 15px; /* Consistent spacing between items */
+            }
+            .toggle-title {
+                float: left;
+                font-weight: bold;
+                margin-right: 10px;
+                line-height: 20px;
+            }
+            .toggle-switch {
+                position: relative;
+                display: inline-block;
+                width: 40px;
+                height: 20px;
+                float: right;
+                vertical-align: middle;
+            }
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #ccc;
+                -webkit-transition: .4s;
+                transition: .4s;
+                border-radius: 20px;
+            }
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 16px;
+                width: 16px;
+                left: 2px;
+                bottom: 2px;
+                background-color: white;
+                -webkit-transition: .4s;
+                transition: .4s;
+                border-radius: 50%;
+            }
+            input:checked + .toggle-slider {
+                background-color: #2196F3;
+            }
+            input:checked + .toggle-slider:before {
+                -webkit-transform: translateX(20px);
+                -ms-transform: translateX(20px);
+                transform: translateX(20px);
+            }
+            .toggle-description {
+                clear: both;
+                margin-left: 0;
+                font-size: 12px;
+                color: #666;
+                padding-top: 5px;
+            }
             .wrap { max-width: 1200px; }
             #predefined-blocks { padding: 10px; width: 100%; }
-            #toggle-blocks { padding: 10px; }
         </style>
         <script>
             jQuery(document).ready(function($) {

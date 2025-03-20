@@ -3,12 +3,6 @@ WP_HTAccess_Manager Changelog
 
 
 
-Version 1.9.53 - March 18, 2025
-- Adjusted layout to stack code-block buttons and toggle list vertically, both spanning the full width of the wrap container.
-
-Version 1.9.51 - March 18, 2025
-- Fixed toggle list layout to use column-count for a balanced two-column display, preventing items from spilling below.
-
 Version 1.9.49 - March 18, 2025
 - Enhanced BLOCK_MALICIOUS_UPLOAD to detect executable extensions (php, asp, cgi, etc.) and traversal patterns in any query parameter, removing the file= restriction.
 

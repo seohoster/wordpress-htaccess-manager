@@ -1,7 +1,15 @@
 WP_HTAccess_Manager Changelog
 ===========================
 
+Version 1.9.56 - March 18, 2025
+- Added BLOCK_IFRAME rule to block iframe embedding with X-Frame-Options SAMEORIGIN, with exceptions for specific paths (e.g., /example-page).
 
+Version 1.9.55 - March 18, 2025
+- Added REDIRECT_DOTS rule to return a 404 Not Found for any .something file, confusing attackers.
+- Updated PROTECT_SENSITIVE_FILES to remove hidden file protection, as it’s now handled by REDIRECT_DOTS.
+
+Version 1.9.54 - March 18, 2025
+Merged FILE_SCRIPT_PROTECTION with a new rule into PROTECT_SENSITIVE_FILES, expanding protection to block sensitive files (e.g., .bak, .log, .sql) and hidden files site-wide, except for .well-known.
 
 Version 1.9.49 - March 18, 2025
 - Enhanced BLOCK_MALICIOUS_UPLOAD to detect executable extensions (php, asp, cgi, etc.) and traversal patterns in any query parameter, removing the file= restriction.

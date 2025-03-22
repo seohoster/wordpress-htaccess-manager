@@ -1,9 +1,6 @@
 WP_HTAccess_Manager Changelog
 ===========================
 
-Version 1.9.57 - March 18, 2025
-- Moved Lee's .htaccess Manager to a submenu under a new "Lee's Mods" parent menu in the WordPress admin sidebar.
-
 Version 1.9.56 - March 18, 2025
 - Added BLOCK_IFRAME rule to block iframe embedding with X-Frame-Options SAMEORIGIN, with exceptions for specific paths (e.g., /example-page).
 

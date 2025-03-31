@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Lee's .htaccess Manager by Lee @ Magazinon.ro
  * Description: A lightweight plugin by Lee @ Magazinon.ro to manage root and wp-admin .htaccess files with predefined blocks.
- * Version: 1.9.56  
+ * Version: 1.9.57  
  * Author: Lee @ <a href="https://www.magazinon.ro" target="_blank">Magazinon.ro</a>
  * License: GPL2
  *
@@ -19,7 +19,7 @@
  * 10. auto_correct_htaccess() - Automatically fixes common syntax mistakes in .htaccess
  * 11. send_email_notifications() - Sends admin notifications when .htaccess is modified
  * 12. enable_live_tester() - Allows users to test .htaccess rules before applying them
- * 13. check_permissions() - Verifies user permissions and file writability
+ * 13. check_permissions() - Verifies user permissions and file writability, with enhanced diagnostics
  * 14. render_admin_page() - Renders the admin page with menu and .htaccess editor
  * 15. ajax_test_htaccess() - Handles AJAX requests for testing .htaccess rules
  * 16. ajax_restore_backup() - Handles AJAX requests to restore a backup
@@ -37,6 +37,7 @@
  * 28. set_rate_limit_cookie() - Sets rate limit exemption cookie for admin
  * 29. activate() - Plugin activation hook
  * 30. deactivate() - Plugin deactivation hook
+ * 31. write_file_with_fallback() - Attempts to write to a file with WP_Filesystem fallback
  */
 
 if (!defined('ABSPATH')) {
@@ -215,13 +216,72 @@ class WP_HTAccess_Manager {
             return false;
         }
 
-        if (!is_writable($this->root_htaccess) || !is_writable($this->admin_htaccess)) {
-            add_action('admin_notices', function() {
-                echo '<div class="notice notice-error"><p>Unable to write to one or both .htaccess files. Check permissions.</p></div>';
+        $files = [$this->root_htaccess, $this->admin_htaccess];
+        $issues = [];
+        $all_writable = true;
+
+        foreach ($files as $file) {
+            if (!file_exists($file)) {
+                // Attempt to create the file if it doesn’t exist
+                if (touch($file)) {
+                    chmod($file, 0664); // Set reasonable permissions
+                } else {
+                    $issues[] = "File $file does not exist and could not be created.";
+                    $all_writable = false;
+                    continue;
+                }
+            }
+
+            if (!is_writable($file)) {
+                $stat = stat($file);
+                $owner = posix_getpwuid($stat['uid'])['name'] ?? $stat['uid'];
+                $perms = sprintf('%o', $stat['mode'] & 0777);
+                $issues[] = "File $file is not writable. Owner: $owner, Permissions: $perms.";
+                // Attempt to fix permissions
+                if (@chmod($file, 0664)) {
+                    $issues[] = "Permissions for $file adjusted to 664.";
+                } else {
+                    $all_writable = false;
+                }
+            }
+        }
+
+        if (!empty($issues)) {
+            $message = '<p>' . implode('<br>', $issues) . '</p>';
+            $message .= '<p><strong>Tip:</strong> On shared hosting, ensure .htaccess files are owned by the web server user (e.g., www-data) or have permissions set to 664. Contact your host to adjust ownership if needed.</p>';
+            add_action('admin_notices', function() use ($message) {
+                echo '<div class="notice notice-error is-dismissible">' . $message . '</div>';
             });
+            $this->log_changes('', "Permission check failed: " . implode("\n", $issues));
+        }
+
+        return $all_writable;
+    }
+
+    private function write_file_with_fallback($file, $content) {
+        // Try direct write first
+        if (@file_put_contents($file, $content) !== false) {
+            return true;
+        }
+    
+        // Fallback to WP_Filesystem
+        if (!function_exists('WP_Filesystem')) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+    
+        global $wp_filesystem;
+        if (!WP_Filesystem()) {
+            $this->log_changes('', "WP_Filesystem initialization failed for $file.");
             return false;
         }
-        return true;
+    
+        if ($wp_filesystem->put_contents($file, $content, 0664)) {
+            $this->log_changes('', "Successfully wrote to $file using WP_Filesystem fallback.");
+            return true;
+        }
+    
+        $this->log_changes('', "Failed to write to $file even with WP_Filesystem.");
+        return false;
     }
 
     public function validate_htaccess($content) {
@@ -318,7 +378,7 @@ class WP_HTAccess_Manager {
         if ($this->validate_htaccess($content)) {
             $target_file = ($file_to_edit === 'admin') ? $this->admin_htaccess : $this->root_htaccess;
             $original_content = file_exists($target_file) ? file_get_contents($target_file) : '';
-            if (file_put_contents($target_file, $content) !== false) {
+            if ($this->write_file_with_fallback($target_file, $content)) {
                 $this->log_changes($original_content, $content);
                 $this->send_email_notifications("Updated $file_to_edit .htaccess");
                 $this->set_admin_notice(".htaccess file updated successfully!", 'success');
@@ -331,7 +391,7 @@ class WP_HTAccess_Manager {
                     delete_option("htaccess_manager_custom_rules_{$file_to_edit}");
                 }
             } else {
-                $this->set_admin_notice("Error: Failed to write to .htaccess file.", 'error');
+                $this->set_admin_notice("Error: Failed to write to .htaccess file. Check server permissions or contact your host.", 'error');
             }
         } else {
             $this->set_admin_notice("Error: Invalid .htaccess syntax detected! Changes were not applied.", 'error');
@@ -369,6 +429,7 @@ class WP_HTAccess_Manager {
                 <?php wp_nonce_field('htaccess_manager_save', 'htaccess_nonce'); ?>
                 <input type="hidden" name="htaccess_file" value="<?php echo esc_attr($current_file); ?>">
                 <h2>Editing: <?php echo $current_file === 'root' ? 'Root' : 'wp-admin'; ?> .htaccess</h2>
+                <p style="font-size: 12px; color: #666;"><em>Note: If you can’t save changes on shared hosting, ensure .htaccess files have 664 permissions and are owned by the web server user (e.g., www-data). Use FTP or ask your host to adjust.</em></p>
                 <textarea name="htaccess_content" id="htaccess-editor" rows="15" cols="80"><?php echo esc_textarea($content); ?></textarea>
                 <div style="width: 100%;">
                     <div style="width: 100%;">
@@ -874,13 +935,13 @@ class WP_HTAccess_Manager {
         }
     
         $content = file_get_contents($backup_path);
-        if (file_put_contents($file_to_restore, $content) !== false) {
+        if ($this->write_file_with_fallback($file_to_restore, $content)) {
             $this->log_changes('', $content);
             $this->send_email_notifications("Restored $backup_file to " . ($file_to_restore === $this->admin_htaccess ? 'wp-admin' : 'root') . " .htaccess");
             $this->set_admin_notice("Backup $backup_file restored successfully.", 'success');
             wp_send_json(['success' => true, 'content' => $content]);
         } else {
-            $this->set_admin_notice('Failed to restore backup.', 'error');
+            $this->set_admin_notice('Failed to restore backup. Check server permissions.', 'error');
             wp_send_json(['success' => false]);
         }
     }

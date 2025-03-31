@@ -1,6 +1,12 @@
 WP_HTAccess_Manager Changelog
 ===========================
 
+Version 1.9.57 - March 31, 2025
+ -Enhanced**: Improved permission handling for shared hosting environments with detailed diagnostics and automatic permission fixes where possible.
+- Added**: New `write_file_with_fallback()` method using WP_Filesystem API as a fallback for file writing, improving compatibility with restrictive hosting setups.
+- Improved**: Added troubleshooting note in the admin interface for shared hosting permission issues.
+- Fixed**: Potential issues with file creation and writing on Linux servers where permissions or ownership differ from local environments.
+
 Version 1.9.56 - March 18, 2025
 - Added BLOCK_IFRAME rule to block iframe embedding with X-Frame-Options SAMEORIGIN, with exceptions for specific paths (e.g., /example-page).
 
